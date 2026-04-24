@@ -21,3 +21,5 @@ build/
 .idea/
 *.swp
 .DS_Store
+/ai-ml/dataset
+/ai-ml/results/processed
