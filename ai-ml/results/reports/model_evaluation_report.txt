@@ -1,0 +1,15 @@
+Basic Bearing Predictive Maintenance Model Evaluation
+===============================================
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      normal     0.6547    0.6547    0.6547     75465
+     warning     0.3235    0.3235    0.3235     31443
+    critical     0.2494    0.2494    0.2494     18867
+
+    accuracy                         0.5111    125775
+   macro avg     0.4092    0.4092    0.4092    125775
+weighted avg     0.5111    0.5111    0.5111    125775
+
+Accuracy: 0.511119
