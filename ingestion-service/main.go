@@ -5,6 +5,7 @@ import (
 	"ingestion-service/config"
 	"ingestion-service/db"
 	"ingestion-service/handlers"
+	"ingestion-service/models"
 	"ingestion-service/router"
 	"ingestion-service/services"
 	"log"
@@ -16,6 +17,10 @@ func main() {
 	db.InitDB(config.DBUser, config.DBPassword, config.DBName, config.DBHost, config.DBPort)
 	if db.ORM == nil {
 		log.Fatal("Database connection not established")
+	}
+
+	if err := db.ORM.AutoMigrate(&models.Device{}); err != nil {
+		log.Fatalf("Failed to migrate database schema: %v", err)
 	}
 
 	kafkaProducer := services.NewKafkaProducer(config.KafkaBrokers, config.KafkaTopic)
