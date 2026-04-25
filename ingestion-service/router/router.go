@@ -9,7 +9,7 @@ import (
 func NewRouter() *gin.Engine {
 	r := gin.Default()
 
-	r.GET("/ingest/health", handlers.HealthCheck)
+	r.GET("/health", handlers.HealthCheck)
 	
 	return r
 }
