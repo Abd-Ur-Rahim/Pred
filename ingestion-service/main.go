@@ -18,6 +18,14 @@ func main() {
 		log.Fatal("Database connection not established")
 	}
 
+	kafkaProducer := services.NewKafkaProducer(config.KafkaBrokers, config.KafkaTopic)
+	handlers.SetKafkaProducer(kafkaProducer)
+	defer func() {
+		if err := kafkaProducer.Close(); err != nil {
+			log.Printf("Failed to close Kafka producer: %v", err)
+		}
+	}()
+
 	mqttClient := services.CreateMQTTClient(
 		config.MQTTBroker,
 		config.MQTTClientID,
@@ -33,7 +41,6 @@ func main() {
 		log.Fatalf("MQTT subscribe failed: %v", err)
 	}
 	defer services.DisconnectMQTTClient(mqttClient)
-
 
 	r := router.NewRouter()
 	log.Fatal(r.Run(fmt.Sprintf(":%s", config.Port)))
