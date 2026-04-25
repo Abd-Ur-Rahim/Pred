@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var Port string
+var Port, DBHost, DBPort, DBUser, DBPassword, DBName string
 
 func LoadConfig() {
 	err := godotenv.Load(".env")
@@ -17,6 +17,11 @@ func LoadConfig() {
 	}
 
 	Port = os.Getenv("PORT")
+	DBHost = os.Getenv("DB_HOST")
+	DBPort = os.Getenv("DB_PORT")
+	DBUser = os.Getenv("DB_USER")
+	DBPassword = os.Getenv("DB_PASSWORD")
+	DBName = os.Getenv("DB_NAME")
 
 	fmt.Printf("Configuration loaded: PORT=%s\n", Port)
 }
