@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var Port, DBHost, DBPort, DBUser, DBPassword, DBName string
+var Port, DBHost, DBPort, DBUser, DBPassword, DBName, KafkaBrokers, KafkaTopic string
 
 func LoadConfig() {
 	err := godotenv.Load(".env")
@@ -22,6 +22,9 @@ func LoadConfig() {
 	DBUser = os.Getenv("DB_USER")
 	DBPassword = os.Getenv("DB_PASSWORD")
 	DBName = os.Getenv("DB_NAME")
+	KafkaBrokers = os.Getenv("KAFKA_BROKERS")
+	KafkaTopic = os.Getenv("KAFKA_TOPIC")
+
 
 	fmt.Printf("Configuration loaded: PORT=%s\n", Port)
 }
