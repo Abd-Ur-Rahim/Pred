@@ -38,7 +38,7 @@ go build ./...
 In another terminal:
 
 ```bash
-curl http://localhost:8080/ingest/health
+curl http://localhost:8080/health
 ```
 
 Expected response:
