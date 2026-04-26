@@ -12,6 +12,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"gorm.io/gorm"
+	"github.com/joho/godotenv"
 
 	"notifications-service/db"
 )
@@ -32,6 +33,11 @@ type Recipient struct {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found")
+	}
+
 	brokers := getEnv("KAFKA_BROKERS", "localhost:9092")
 	topic := getEnv("KAFKA_TOPIC", "notifications")
 	groupID := getEnv("KAFKA_GROUP_ID", "notifications-service")
