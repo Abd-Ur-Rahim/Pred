@@ -35,3 +35,14 @@ cp .env.example .env
 # fill in values
 go run .
 ```
+
+## Tests
+
+Integration tests need their own Postgres (separate from the dev one) and skip when `TEST_DATABASE_URL` is unset. Use the Makefile targets — they bring up `../docker-compose.test.yml` at the repo root (Postgres on host port `5434`) and inject the env var:
+
+```sh
+make test       # starts test Postgres, waits for healthy, runs `go test ./...`
+make test-down  # tears down the test container and volume
+```
+
+The test compose runs alongside the dev `docker-compose.yml` without conflict.
