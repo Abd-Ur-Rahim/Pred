@@ -11,17 +11,35 @@ Consumes alert events from a Kafka topic and delivers notifications to end users
 
 We may use Resend for email delivery.
 
+## Database
+
+Notifications are persisted in PostgreSQL. On startup the service runs a `CREATE TABLE IF NOT EXISTS` migration, so no separate migration tool is needed.
+
+**Schema — `notifications` table**
+
+| Column       | Type          | Description                                       |
+| ------------ | ------------- | ------------------------------------------------- |
+| `id`         | `BIGSERIAL`   | Primary key                                       |
+| `tenant_id`  | `TEXT`        | Tenant the notification belongs to                |
+| `recipient`  | `TEXT`        | Email address or device token                     |
+| `type`       | `TEXT`        | `email` or `push`                                 |
+| `payload`    | `JSONB`       | Raw alert payload from the Kafka message          |
+| `status`     | `TEXT`        | `pending` → `delivered` / `failed`                |
+| `created_at` | `TIMESTAMPTZ` | Row creation time                                 |
+| `updated_at` | `TIMESTAMPTZ` | Last status update time                           |
+
 ## Multi-tenancy
 
 Every notification is scoped to a tenant. Tenant context is carried in the Kafka message and used to resolve recipient preferences, delivery credentials, and data isolation in the database.
 
 ## Configuration
 
-| Variable         | Default                 | Description                                                                 |
-| ---------------- | ----------------------- | --------------------------------------------------------------------------- |
-| `KAFKA_BROKERS`  | `localhost:9092`        | Comma-separated list of Kafka bootstrap brokers                             |
-| `KAFKA_TOPIC`    | `notifications`         | Topic the consumer subscribes to                                            |
-| `KAFKA_GROUP_ID` | `notifications-service` | Consumer group ID — instances sharing this ID split partitions between them |
+| Variable         | Default                                     | Description                                                                 |
+| ---------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| `KAFKA_BROKERS`  | `localhost:9092`                            | Comma-separated list of Kafka bootstrap brokers                             |
+| `KAFKA_TOPIC`    | `notifications`                             | Topic the consumer subscribes to                                            |
+| `KAFKA_GROUP_ID` | `notifications-service`                     | Consumer group ID — instances sharing this ID split partitions between them |
+| `DATABASE_URL`   | `postgres://localhost:5432/notifications`   | PostgreSQL connection string                                                |
 
 ## Running
 
