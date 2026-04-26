@@ -13,20 +13,7 @@ We may use Resend for email delivery.
 
 ## Database
 
-Notifications are persisted in PostgreSQL. On startup the service runs a `CREATE TABLE IF NOT EXISTS` migration, so no separate migration tool is needed.
-
-**Schema — `notifications` table**
-
-| Column       | Type          | Description                                       |
-| ------------ | ------------- | ------------------------------------------------- |
-| `id`         | `BIGSERIAL`   | Primary key                                       |
-| `tenant_id`  | `TEXT`        | Tenant the notification belongs to                |
-| `recipient`  | `TEXT`        | Email address or device token                     |
-| `type`       | `TEXT`        | `email` or `push`                                 |
-| `payload`    | `JSONB`       | Raw alert payload from the Kafka message          |
-| `status`     | `TEXT`        | `pending` → `delivered` / `failed`                |
-| `created_at` | `TIMESTAMPTZ` | Row creation time                                 |
-| `updated_at` | `TIMESTAMPTZ` | Last status update time                           |
+Notifications are persisted in PostgreSQL. Schema is managed by GORM via `AutoMigrate` on startup — idempotent, no separate migration tool needed. Models live in the `db` package.
 
 ## Multi-tenancy
 

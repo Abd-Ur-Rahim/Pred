@@ -17,3 +17,5 @@ All services must have a `.env.example` file with the required and optional envi
 All services must have a `README.md` file with the following sections:
 - What it is supposed to do
 - How to run it
+
+Service READMEs must not document database internals (tables, columns, indexes). That level of detail belongs in the code (models, migrations).

@@ -10,8 +10,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/segmentio/kafka-go"
+	"gorm.io/gorm"
+
+	"notifications-service/db"
 )
 
 // AlertEvent is the message schema consumed from Kafka.
@@ -38,11 +40,13 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	pool, err := initDB(ctx, dbURL)
+	gdb, err := db.Open(ctx, dbURL)
 	if err != nil {
 		log.Fatalf("database init failed: %v", err)
 	}
-	defer pool.Close()
+	if sqlDB, err := gdb.DB(); err == nil {
+		defer sqlDB.Close()
+	}
 	log.Println("connected to database")
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
@@ -65,46 +69,46 @@ func main() {
 			continue
 		}
 
-		if err := handleMessage(ctx, pool, msg); err != nil {
+		if err := handleMessage(ctx, gdb, msg); err != nil {
 			log.Printf("handle error (offset %d): %v", msg.Offset, err)
 		}
 	}
 }
 
-func handleMessage(ctx context.Context, pool *pgxpool.Pool, msg kafka.Message) error {
+func handleMessage(ctx context.Context, gdb *gorm.DB, msg kafka.Message) error {
 	var event AlertEvent
 	if err := json.Unmarshal(msg.Value, &event); err != nil {
 		return fmt.Errorf("unmarshal: %w", err)
 	}
 
-	notifID, err := insertNotification(ctx, pool, event.TenantID, event.Type, event.Payload)
+	notifID, err := db.InsertNotification(ctx, gdb, event.TenantID, event.Type, event.Payload)
 	if err != nil {
 		return fmt.Errorf("insert notification: %w", err)
 	}
 
 	switch event.Type {
 	case "push":
-		return fanOutPush(ctx, pool, notifID, event)
+		return fanOutPush(ctx, gdb, notifID, event)
 	case "email":
-		return fanOutEmail(ctx, pool, notifID, event)
+		return fanOutEmail(ctx, gdb, notifID, event)
 	default:
 		return fmt.Errorf("unknown notification type %q", event.Type)
 	}
 }
 
-func fanOutPush(ctx context.Context, pool *pgxpool.Pool, notifID int64, event AlertEvent) error {
+func fanOutPush(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEvent) error {
 	userIDs := make([]string, len(event.Recipients))
 	for i, r := range event.Recipients {
 		userIDs[i] = r.UserID
 	}
 
-	tokens, err := deviceTokensForUsers(ctx, pool, event.TenantID, userIDs)
+	tokens, err := db.DeviceTokensForUsers(ctx, gdb, event.TenantID, userIDs)
 	if err != nil {
 		return fmt.Errorf("lookup device tokens: %w", err)
 	}
 
 	for _, t := range tokens {
-		deliveryID, err := insertDelivery(ctx, pool, notifID, event.TenantID, t.UserID, t.Token, &t.ID)
+		deliveryID, err := db.InsertDelivery(ctx, gdb, notifID, event.TenantID, t.UserID, t.Token, &t.ID)
 		if err != nil {
 			log.Printf("insert delivery failed (user %s, token %s): %v", t.UserID, t.Token, err)
 			continue
@@ -116,16 +120,16 @@ func fanOutPush(ctx context.Context, pool *pgxpool.Pool, notifID int64, event Al
 			status, errMsg = "failed", pushErr.Error()
 		}
 
-		if err := updateDeliveryStatus(ctx, pool, deliveryID, status, errMsg); err != nil {
+		if err := db.UpdateDeliveryStatus(ctx, gdb, deliveryID, status, errMsg); err != nil {
 			log.Printf("update status failed (delivery %d): %v", deliveryID, err)
 		}
 	}
 	return nil
 }
 
-func fanOutEmail(ctx context.Context, pool *pgxpool.Pool, notifID int64, event AlertEvent) error {
+func fanOutEmail(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEvent) error {
 	for _, r := range event.Recipients {
-		deliveryID, err := insertDelivery(ctx, pool, notifID, event.TenantID, r.UserID, r.Email, nil)
+		deliveryID, err := db.InsertDelivery(ctx, gdb, notifID, event.TenantID, r.UserID, r.Email, nil)
 		if err != nil {
 			log.Printf("insert delivery failed (user %s, email %s): %v", r.UserID, r.Email, err)
 			continue
@@ -137,7 +141,7 @@ func fanOutEmail(ctx context.Context, pool *pgxpool.Pool, notifID int64, event A
 			status, errMsg = "failed", emailErr.Error()
 		}
 
-		if err := updateDeliveryStatus(ctx, pool, deliveryID, status, errMsg); err != nil {
+		if err := db.UpdateDeliveryStatus(ctx, gdb, deliveryID, status, errMsg); err != nil {
 			log.Printf("update status failed (delivery %d): %v", deliveryID, err)
 		}
 	}
