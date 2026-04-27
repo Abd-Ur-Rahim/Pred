@@ -44,6 +44,15 @@ go mod download
 go run .
 ```
 
+Set up the event processing service:
+
+```sh
+cd event-processing-service
+cp .env.example .env       # edit if defaults don't match
+go mod download
+go run .
+```
+
 Set up the web frontend:
 
 ```sh
@@ -54,12 +63,16 @@ npm run dev
 
 ### Running tests
 
-The notifications service ships its own test infrastructure (separate Postgres on host port `5434`) so it doesn't conflict with the dev compose:
+Go services share a single test Postgres instance (host port `5434`) defined in `docker-compose.test.yml`, which hosts a separate database per service. It runs alongside the dev compose without conflict:
 
 ```sh
 cd notifications-service
 make test         # brings up the test Postgres and runs `go test ./...`
 make test-down    # tear down when finished
+
+cd ../event-processing-service
+make test
+make test-down
 ```
 
 ## Services

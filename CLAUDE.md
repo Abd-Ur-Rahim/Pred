@@ -7,10 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Monorepo for a multi-tenant predictive maintenance system (university SE module project). Top-level services:
 
 - `notifications-service/` — Go service that consumes alert events from Kafka and delivers email/push notifications.
+- `event-processing-service/` — Go service that consumes the raw events Kafka topic and persists each event to its own Postgres database (downstream processing logic is a stub).
 - `web-frontend/` — Next.js 16 + React 19 app (Tailwind v4, Biome, shadcn/radix). See `web-frontend/AGENTS.md` — this Next.js version has breaking changes vs. training-data Next.js; consult `node_modules/next/dist/docs/` before writing frontend code.
 - `postgres/init/` — entrypoint script that creates multiple databases inside the shared Postgres container, driven by `POSTGRES_MULTIPLE_DATABASES` (comma-separated).
 - `docker-compose.yml` — dev infra: Postgres 18 (host port **5433**) and Kafka (host port **9092**, KRaft mode, auto-create topics on).
-- `docker-compose.test.yml` — isolated test Postgres (host port **5434**, db `notifications_test`) used by integration tests; runs alongside the dev compose without conflict.
+- `docker-compose.test.yml` — single isolated test Postgres on host port **5434** hosting both `notifications_test` and `events_test` databases (created by the same `postgres/init/create-databases.sh` script); runs alongside the dev compose without conflict.
 
 ## Common commands
 
@@ -22,6 +23,8 @@ make test                 # brings up test Postgres (--wait), runs `go test ./..
 make test-down            # tears down the test container + volume
 go test ./db -run TestX   # run a single test
 ```
+
+Event processing service (run from `event-processing-service/`) — same command surface (`go run .`, `make test`, `make test-down`).
 
 Integration tests skip when `TEST_DATABASE_URL` is unset — always go through `make test` rather than bare `go test` if you want DB tests to run.
 
