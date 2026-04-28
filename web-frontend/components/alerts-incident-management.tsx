@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,7 +27,7 @@ interface Alert {
   description: string;
 }
 
-const mockAlerts: Alert[] = [
+const initialMockAlerts: Alert[] = [
   {
     id: "#71630",
     asset: "TURB-A-09",
@@ -79,6 +80,40 @@ const mockAlerts: Alert[] = [
   },
 ];
 
+// Potential error scenarios for assets
+const errorScenarios = [
+  {
+    asset: "TURB-A-09",
+    severity: "CRITICAL" as const,
+    type: "Rotor Imbalance Detected",
+    description: "Rotor imbalance levels exceeded operational limits",
+  },
+  {
+    asset: "HVAC-M-01",
+    severity: "WARNING" as const,
+    type: "Coolant Flow Rate Low",
+    description: "Coolant circulation below minimum threshold",
+  },
+  {
+    asset: "PUMP-R-04",
+    severity: "CRITICAL" as const,
+    type: "Seal Integrity Compromised",
+    description: "Pump seal showing signs of degradation",
+  },
+  {
+    asset: "PUMP-R-02",
+    severity: "WARNING" as const,
+    type: "Pressure Fluctuation Detected",
+    description: "Abnormal pressure oscillations in outlet line",
+  },
+  {
+    asset: "COMPRESSOR-04",
+    severity: "WARNING" as const,
+    type: "Temperature Rise Alert",
+    description: "Compressor temperature exceeding normal range",
+  },
+];
+
 const getSeverityColor = (severity: string) => {
   switch (severity) {
     case "CRITICAL":
@@ -112,23 +147,87 @@ const getStatusColor = (status: string) => {
   return "text-gray-500";
 };
 
+const getFormattedTime = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 export function AlertsIncidentManagement() {
-  const [selectedAlert, setSelectedAlert] = useState<Alert>(mockAlerts[0]);
+  const [allAlerts, setAllAlerts] = useState<Alert[]>(initialMockAlerts);
+  const [selectedAlert, setSelectedAlert] = useState<Alert>(
+    initialMockAlerts[0],
+  );
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [assetGroupFilter, setAssetGroupFilter] = useState("ALL ASSETS");
   const [timeRange, setTimeRange] = useState("LAST 24 HOURS");
   const [currentPage, setCurrentPage] = useState(1);
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(
-    new Set(mockAlerts.filter((a) => a.acknowledged).map((a) => a.id)),
+    new Set(initialMockAlerts.filter((a) => a.acknowledged).map((a) => a.id)),
   );
+  const [nextAlertId, setNextAlertId] = useState(100);
+  const [autoGenerateEnabled, setAutoGenerateEnabled] = useState(true);
+
+  // Auto-generate new alerts periodically (every 15 seconds)
+  useEffect(() => {
+    if (!autoGenerateEnabled) return;
+
+    const interval = setInterval(() => {
+      // Randomly decide if a new error should occur (30% chance)
+      if (Math.random() > 0.7) {
+        const randomError =
+          errorScenarios[Math.floor(Math.random() * errorScenarios.length)];
+        const newAlertId = `#${Date.now().toString().slice(-5)}${nextAlertId}`;
+
+        const newAlert: Alert = {
+          id: newAlertId,
+          asset: randomError.asset,
+          severity: randomError.severity,
+          type: randomError.type,
+          timeDetected: getFormattedTime(),
+          status: "UNACKNOWLEDGED",
+          acknowledged: false,
+          description: randomError.description,
+        };
+
+        setAllAlerts((prev) => [newAlert, ...prev]);
+        setNextAlertId((prev) => prev + 1);
+
+        // Auto-select the new alert
+        setSelectedAlert(newAlert);
+      }
+    }, 15000); // Check every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [autoGenerateEnabled, nextAlertId]);
 
   // Filter alerts based on severity filter
   const filteredAlerts = severityFilter
-    ? mockAlerts.filter((alert) => alert.severity === severityFilter)
-    : mockAlerts;
+    ? allAlerts.filter((alert) => alert.severity === severityFilter)
+    : allAlerts;
 
   const itemsPerPage = 5;
   const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
+
+  const unacknowledgedCount = allAlerts.filter(
+    (alert) => !acknowledgedAlerts.has(alert.id),
+  ).length;
+  const criticalCount = allAlerts.filter(
+    (alert) =>
+      alert.severity === "CRITICAL" && !acknowledgedAlerts.has(alert.id),
+  ).length;
+  const warningCount = allAlerts.filter(
+    (alert) =>
+      alert.severity === "WARNING" && !acknowledgedAlerts.has(alert.id),
+  ).length;
+  const infoCount = allAlerts.filter(
+    (alert) => alert.severity === "INFO" && !acknowledgedAlerts.has(alert.id),
+  ).length;
 
   const handleAcknowledgeAlert = (alertId: string) => {
     const newAcknowledged = new Set(acknowledgedAlerts);
@@ -151,13 +250,27 @@ export function AlertsIncidentManagement() {
             ALERTS & INCIDENT MANAGEMENT
           </h2>
           <p className="text-slate-400 text-sm">
-            Active Telemetry Anomalies and Fault Records
+            Active Telemetry Anomalies and Fault Records ({unacknowledgedCount}{" "}
+            unacknowledged)
           </p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
-          <Download className="w-4 h-4" />
-          EXPORT JSON
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setAutoGenerateEnabled(!autoGenerateEnabled)}
+            className={`gap-2 font-semibold text-xs ${
+              autoGenerateEnabled
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-slate-700 hover:bg-slate-600"
+            }`}
+          >
+            <RefreshCw className="w-4 h-4" />
+            {autoGenerateEnabled ? "LIVE" : "PAUSED"}
+          </Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
+            <Download className="w-4 h-4" />
+            EXPORT JSON
+          </Button>
+        </div>
       </div>
 
       {/* Advanced Filtering Section */}
@@ -170,9 +283,9 @@ export function AlertsIncidentManagement() {
             </label>
             <div className="flex gap-2">
               {[
-                { label: "CRITICAL (3)", value: "CRITICAL" },
-                { label: "WARNING (12)", value: "WARNING" },
-                { label: "INFO (45)", value: "INFO" },
+                { label: "CRITICAL", value: "CRITICAL", count: criticalCount },
+                { label: "WARNING", value: "WARNING", count: warningCount },
+                { label: "INFO", value: "INFO", count: infoCount },
               ].map((severity) => (
                 <button
                   key={severity.value}
@@ -191,7 +304,7 @@ export function AlertsIncidentManagement() {
                       : "border-slate-600 text-slate-300 hover:border-slate-500"
                   }`}
                 >
-                  {severity.label}
+                  {severity.label} ({severity.count})
                 </button>
               ))}
             </div>
@@ -246,16 +359,20 @@ export function AlertsIncidentManagement() {
 
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-slate-700 pb-4">
-        {["OPTIONS (3)", "BRIEFING (18)", "INFO (45)"].map((filter) => (
+        {[
+          { label: "CRITICAL", count: criticalCount },
+          { label: "WARNING", count: warningCount },
+          { label: "INFO", count: infoCount },
+        ].map((tab) => (
           <button
-            key={filter}
+            key={tab.label}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
-              filter.includes("OPTIONS")
+              tab.label === "CRITICAL"
                 ? "text-orange-400 border-b-2 border-orange-400"
                 : "text-slate-400 hover:text-slate-300"
             }`}
           >
-            {filter}
+            {tab.label} ({tab.count})
           </button>
         ))}
       </div>
