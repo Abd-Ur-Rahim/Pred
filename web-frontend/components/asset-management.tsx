@@ -106,7 +106,8 @@ export function AssetManagement() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Asset Management</h1>
           <p className="text-slate-400 text-sm">
-            Manage and monitor 1,248 connected industrial sensors across 4 nodes.
+            Manage and monitor 1,248 connected industrial sensors across 4
+            nodes.
           </p>
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 px-6 font-semibold uppercase text-sm flex items-center gap-2">
@@ -120,10 +121,7 @@ export function AssetManagement() {
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
-            <Card
-              key={idx}
-              className="bg-slate-800/50 border-slate-700 p-6"
-            >
+            <Card key={idx} className="bg-slate-800/50 border-slate-700 p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="text-xs text-slate-400 font-semibold uppercase">
                   {stat.label}

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { AlertsIncidentManagement } from "@/components/ui/alerts-incident-management";
 import { AssetDetail } from "@/components/ui/asset-detail";
+import { AssetManagement } from "@/components/asset-management";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState("dashboard");
@@ -69,7 +70,14 @@ export default function Home() {
               <AlertTriangle className="w-5 h-5" />
               <span className="text-sm">Alerts</span>
             </div>
-            <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors">
+            <div
+              onClick={() => setCurrentView("assets")}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                currentView === "assets"
+                  ? "bg-slate-800 text-blue-400 border-l-4 border-blue-400"
+                  : "hover:bg-slate-800 text-slate-300"
+              }`}
+            >
               <Box className="w-5 h-5" />
               <span className="text-sm">Assets</span>
             </div>
@@ -126,6 +134,16 @@ export default function Home() {
                 }`}
               >
                 ALERTS & INCIDENTS
+              </div>
+              <div
+                onClick={() => setCurrentView("assets")}
+                className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
+                  currentView === "assets"
+                    ? "text-blue-400 border-b-2 border-blue-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                ASSET MANAGEMENT
               </div>
               <div className="text-sm text-slate-400 cursor-pointer hover:text-white">
                 ANALYTICS
@@ -400,6 +418,8 @@ export default function Home() {
             <AssetDetail onBack={() => setCurrentView("dashboard")} />
           ) : currentView === "alerts" ? (
             <AlertsIncidentManagement />
+          ) : currentView === "assets" ? (
+            <AssetManagement />
           ) : null}
         </div>
       </div>
