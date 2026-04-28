@@ -22,7 +22,7 @@ import {
 import { AlertsIncidentManagement } from "@/components/ui/alerts-incident-management";
 import { AssetDetail } from "@/components/ui/asset-detail";
 import { AssetManagement } from "@/components/ui/asset-management";
-import { PredictionsDashboard } from "@/components/predictions-dashboard";
+import { PredictionsDashboard } from "@/components/ui/predictions-dashboard";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState("dashboard");
