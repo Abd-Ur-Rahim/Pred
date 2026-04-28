@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { AlertsIncidentManagement } from "@/components/ui/alerts-incident-management";
 import { AssetDetail } from "@/components/ui/asset-detail";
-import { AssetManagement } from "@/components/asset-management";
+import { AssetManagement } from "@/components/ui/asset-management";
+import { PredictionsDashboard } from "@/components/predictions-dashboard";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState("dashboard");
@@ -81,7 +82,14 @@ export default function Home() {
               <Box className="w-5 h-5" />
               <span className="text-sm">Assets</span>
             </div>
-            <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors">
+            <div
+              onClick={() => setCurrentView("predictions")}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                currentView === "predictions"
+                  ? "bg-slate-800 text-blue-400 border-l-4 border-blue-400"
+                  : "hover:bg-slate-800 text-slate-300"
+              }`}
+            >
               <Lightbulb className="w-5 h-5" />
               <span className="text-sm">Predictions</span>
             </div>
@@ -145,11 +153,15 @@ export default function Home() {
               >
                 ASSET MANAGEMENT
               </div>
-              <div className="text-sm text-slate-400 cursor-pointer hover:text-white">
-                ANALYTICS
-              </div>
-              <div className="text-sm text-slate-400 cursor-pointer hover:text-white">
-                FLEET MANAGEMENT
+              <div
+                onClick={() => setCurrentView("predictions")}
+                className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
+                  currentView === "predictions"
+                    ? "text-blue-400 border-b-2 border-blue-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                PREDICTIONS
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -420,6 +432,8 @@ export default function Home() {
             <AlertsIncidentManagement />
           ) : currentView === "assets" ? (
             <AssetManagement />
+          ) : currentView === "predictions" ? (
+            <PredictionsDashboard />
           ) : null}
         </div>
       </div>
