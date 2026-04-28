@@ -19,7 +19,8 @@ import {
   HelpCircle,
   FileText,
 } from "lucide-react";
-import { AlertsIncidentManagement } from "@/components/alerts-incident-management";
+import { AlertsIncidentManagement } from "@/components/ui/alerts-incident-management";
+import { AssetDetail } from "@/components/ui/asset-detail";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState("dashboard");
@@ -46,7 +47,14 @@ export default function Home() {
               <Grid3x3 className="w-5 h-5" />
               <span className="text-sm font-medium">Dashboard</span>
             </div>
-            <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors">
+            <div
+              onClick={() => setCurrentView("motors")}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                currentView === "motors"
+                  ? "bg-slate-800 text-blue-400 border-l-4 border-blue-400"
+                  : "hover:bg-slate-800 text-slate-300"
+              }`}
+            >
               <Settings className="w-5 h-5" />
               <span className="text-sm">Motors</span>
             </div>
@@ -98,6 +106,16 @@ export default function Home() {
                 }`}
               >
                 DASHBOARD
+              </div>
+              <div
+                onClick={() => setCurrentView("motors")}
+                className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
+                  currentView === "motors"
+                    ? "text-blue-400 border-b-2 border-blue-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                MOTORS
               </div>
               <div
                 onClick={() => setCurrentView("alerts")}
@@ -378,6 +396,8 @@ export default function Home() {
                 </div>
               </div>
             </>
+          ) : currentView === "motors" ? (
+            <AssetDetail onBack={() => setCurrentView("dashboard")} />
           ) : currentView === "alerts" ? (
             <AlertsIncidentManagement />
           ) : null}
