@@ -114,12 +114,33 @@ const getStatusColor = (status: string) => {
 
 export function AlertsIncidentManagement() {
   const [selectedAlert, setSelectedAlert] = useState<Alert>(mockAlerts[0]);
-  const [filterType, setFilterType] = useState("ALL");
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [assetGroupFilter, setAssetGroupFilter] = useState("ALL ASSETS");
+  const [timeRange, setTimeRange] = useState("LAST 24 HOURS");
   const [currentPage, setCurrentPage] = useState(1);
+  const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(
+    new Set(mockAlerts.filter((a) => a.acknowledged).map((a) => a.id)),
+  );
 
-  const filteredAlerts = mockAlerts;
+  // Filter alerts based on severity filter
+  const filteredAlerts = severityFilter
+    ? mockAlerts.filter((alert) => alert.severity === severityFilter)
+    : mockAlerts;
+
   const itemsPerPage = 5;
   const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
+
+  const handleAcknowledgeAlert = (alertId: string) => {
+    const newAcknowledged = new Set(acknowledgedAlerts);
+    newAcknowledged.add(alertId);
+    setAcknowledgedAlerts(newAcknowledged);
+  };
+
+  const handleAcknowledgeAll = () => {
+    const newAcknowledged = new Set(acknowledgedAlerts);
+    filteredAlerts.forEach((alert) => newAcknowledged.add(alert.id));
+    setAcknowledgedAlerts(newAcknowledged);
+  };
 
   return (
     <div className="space-y-6">
@@ -139,14 +160,97 @@ export function AlertsIncidentManagement() {
         </Button>
       </div>
 
+      {/* Advanced Filtering Section */}
+      <div className="bg-slate-800/30 border border-slate-700 rounded px-4 py-3 space-y-3">
+        <div className="grid grid-cols-4 gap-4 items-center">
+          {/* Severity Filter */}
+          <div>
+            <label className="text-xs text-slate-400 font-semibold block mb-2">
+              FILTER BY SEVERITY:
+            </label>
+            <div className="flex gap-2">
+              {[
+                { label: "CRITICAL (3)", value: "CRITICAL" },
+                { label: "WARNING (12)", value: "WARNING" },
+                { label: "INFO (45)", value: "INFO" },
+              ].map((severity) => (
+                <button
+                  key={severity.value}
+                  onClick={() =>
+                    setSeverityFilter(
+                      severityFilter === severity.value ? null : severity.value,
+                    )
+                  }
+                  className={`px-3 py-1 text-xs font-semibold rounded border transition-colors ${
+                    severityFilter === severity.value
+                      ? severity.value === "CRITICAL"
+                        ? "bg-red-500/20 border-red-500 text-red-400"
+                        : severity.value === "WARNING"
+                          ? "bg-orange-500/20 border-orange-500 text-orange-400"
+                          : "bg-blue-500/20 border-blue-500 text-blue-400"
+                      : "border-slate-600 text-slate-300 hover:border-slate-500"
+                  }`}
+                >
+                  {severity.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Asset Group Filter */}
+          <div>
+            <label className="text-xs text-slate-400 font-semibold block mb-2">
+              ASSET GROUP:
+            </label>
+            <select
+              value={assetGroupFilter}
+              onChange={(e) => setAssetGroupFilter(e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+            >
+              <option>ALL ASSETS</option>
+              <option>TURBINES</option>
+              <option>PUMPS</option>
+              <option>COMPRESSORS</option>
+              <option>HVAC SYSTEMS</option>
+            </select>
+          </div>
+
+          {/* Time Range Filter */}
+          <div>
+            <label className="text-xs text-slate-400 font-semibold block mb-2">
+              TIME RANGE:
+            </label>
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+            >
+              <option>LAST 24 HOURS</option>
+              <option>LAST 7 DAYS</option>
+              <option>LAST 30 DAYS</option>
+              <option>LAST 90 DAYS</option>
+            </select>
+          </div>
+
+          {/* Acknowledge All Button */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleAcknowledgeAll}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs"
+            >
+              ✓ ACKNOWLEDGE ALL
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-slate-700 pb-4">
-        {["OPTIONS (3)", "BRIEFING (18)", "INFO (49)"].map((filter) => (
+        {["OPTIONS (3)", "BRIEFING (18)", "INFO (45)"].map((filter) => (
           <button
             key={filter}
-            onClick={() => setFilterType(filter.split(" ")[0])}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
-              filterType === filter.split(" ")[0]
+              filter.includes("OPTIONS")
                 ? "text-orange-400 border-b-2 border-orange-400"
                 : "text-slate-400 hover:text-slate-300"
             }`}
@@ -299,54 +403,67 @@ export function AlertsIncidentManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredAlerts.map((alert) => (
-                <tr
-                  key={alert.id}
-                  onClick={() => setSelectedAlert(alert)}
-                  className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
-                    selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                    {alert.id}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                    {alert.asset}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
-                    >
-                      {alert.severity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-300">
-                    {alert.type}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">
-                    {alert.timeDetected}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          alert.acknowledged ? "bg-green-500" : "bg-red-500"
-                        }`}
-                      ></div>
+              {filteredAlerts.map((alert) => {
+                const isAcknowledged = acknowledgedAlerts.has(alert.id);
+                return (
+                  <tr
+                    key={alert.id}
+                    onClick={() => setSelectedAlert(alert)}
+                    className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                      selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
+                    } ${isAcknowledged ? "opacity-60" : ""}`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                      {alert.id}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                      {alert.asset}
+                    </td>
+                    <td className="px-4 py-3">
                       <span
-                        className={`text-xs font-semibold ${getStatusColor(alert.status)}`}
+                        className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
                       >
-                        {alert.status}
+                        {alert.severity}
                       </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button className="text-blue-400 hover:text-blue-300 text-xs font-semibold">
-                      ACKNOWLEDGE
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      {alert.type}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                      {alert.timeDetected}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            isAcknowledged ? "bg-green-500" : "bg-red-500"
+                          }`}
+                        ></div>
+                        <span
+                          className={`text-xs font-semibold ${
+                            isAcknowledged ? "text-green-500" : "text-red-500"
+                          }`}
+                        >
+                          {isAcknowledged ? "ACKNOWLEDGED" : "UNACKNOWLEDGED"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {!isAcknowledged && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcknowledgeAlert(alert.id);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
+                        >
+                          ACKNOWLEDGE
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
