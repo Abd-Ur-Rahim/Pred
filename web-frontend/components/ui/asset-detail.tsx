@@ -1,16 +1,7 @@
 "use client";
 
-import {
-	Activity,
-	AlertCircle,
-	Calendar,
-	ChevronLeft,
-	Power,
-	Settings,
-	Wrench,
-	Zap,
-} from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Activity, ChevronLeft, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -71,6 +62,7 @@ export function AssetDetail({
 				<div className="flex items-start gap-4">
 					{onBack && (
 						<button
+							type="button"
 							onClick={onBack}
 							className="p-2 hover:bg-slate-800 rounded transition-colors mt-1"
 						>
@@ -158,7 +150,7 @@ export function AssetDetail({
 							<h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
 								FFT Frequency Spectrum
 							</h3>
-							<button className="p-1 hover:bg-slate-700 rounded">
+							<button type="button" className="p-1 hover:bg-slate-700 rounded">
 								<Settings className="w-4 h-4 text-slate-400" />
 							</button>
 						</div>
@@ -206,6 +198,7 @@ export function AssetDetail({
 							<div className="flex gap-2">
 								{["5m", "20m", "7d"].map((range) => (
 									<button
+										type="button"
 										key={range}
 										className={`px-2 py-1 text-xs font-semibold rounded transition-colors ${
 											range === "5m"
@@ -278,7 +271,7 @@ export function AssetDetail({
 							<h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
 								Asset Specifications
 							</h3>
-							<button className="p-1 hover:bg-slate-700 rounded">
+							<button type="button" className="p-1 hover:bg-slate-700 rounded">
 								<Activity className="w-4 h-4 text-slate-400" />
 							</button>
 						</div>

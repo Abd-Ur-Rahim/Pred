@@ -1,13 +1,7 @@
 "use client";
 
-import {
-	Activity,
-	AlertTriangle,
-	Download,
-	Filter,
-	TrendingUp,
-} from "lucide-react";
-import React, { useState } from "react";
+import { AlertTriangle, Download, Filter } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -279,7 +273,10 @@ export function PredictionsDashboard() {
 										</span>
 									</td>
 									<td className="py-4 px-4 text-center">
-										<button className="text-blue-400 hover:text-blue-300 text-xs font-semibold uppercase transition-colors">
+										<button
+											type="button"
+											className="text-blue-400 hover:text-blue-300 text-xs font-semibold uppercase transition-colors"
+										>
 											Investigate
 										</button>
 									</td>

@@ -3,14 +3,13 @@
 import {
 	AlertCircle,
 	ArrowUpDown,
-	CheckCircle,
 	Clock,
 	Filter,
 	MoreVertical,
 	Plus,
 	TrendingUp,
 } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -244,7 +243,10 @@ export function AssetManagement() {
 										</div>
 									</td>
 									<td className="py-4 px-4 text-center">
-										<button className="p-1 hover:bg-slate-700 rounded transition-colors">
+										<button
+											type="button"
+											className="p-1 hover:bg-slate-700 rounded transition-colors"
+										>
 											<MoreVertical className="w-4 h-4 text-slate-400" />
 										</button>
 									</td>

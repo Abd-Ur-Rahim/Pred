@@ -1,18 +1,13 @@
 "use client";
 
 import {
-	AlertCircle,
 	AlertTriangle,
-	ArrowRight,
-	CheckCircle,
 	ChevronLeft,
 	ChevronRight,
 	Download,
 	RefreshCw,
-	TrendingDown,
-	TrendingUp,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -237,7 +232,9 @@ export function AlertsIncidentManagement() {
 
 	const handleAcknowledgeAll = () => {
 		const newAcknowledged = new Set(acknowledgedAlerts);
-		filteredAlerts.forEach((alert) => newAcknowledged.add(alert.id));
+		filteredAlerts.forEach((alert) => {
+			newAcknowledged.add(alert.id);
+		});
 		setAcknowledgedAlerts(newAcknowledged);
 	};
 

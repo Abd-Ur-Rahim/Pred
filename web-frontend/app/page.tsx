@@ -38,7 +38,8 @@ export default function Home() {
 				</SidebarHeader>
 				<SidebarContent className="pt-4 px-2 bg-slate-900">
 					<nav className="space-y-1">
-						<div
+						<button
+							type="button"
 							onClick={() => setCurrentView("dashboard")}
 							className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
 								currentView === "dashboard"
@@ -48,8 +49,9 @@ export default function Home() {
 						>
 							<Grid3x3 className="w-5 h-5" />
 							<span className="text-sm font-medium">Dashboard</span>
-						</div>
-						<div
+						</button>
+						<button
+							type="button"
 							onClick={() => setCurrentView("motors")}
 							className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
 								currentView === "motors"
@@ -59,8 +61,9 @@ export default function Home() {
 						>
 							<Settings className="w-5 h-5" />
 							<span className="text-sm">Motors</span>
-						</div>
-						<div
+						</button>
+						<button
+							type="button"
 							onClick={() => setCurrentView("alerts")}
 							className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
 								currentView === "alerts"
@@ -70,8 +73,9 @@ export default function Home() {
 						>
 							<AlertTriangle className="w-5 h-5" />
 							<span className="text-sm">Alerts</span>
-						</div>
-						<div
+						</button>
+						<button
+							type="button"
 							onClick={() => setCurrentView("assets")}
 							className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
 								currentView === "assets"
@@ -81,8 +85,9 @@ export default function Home() {
 						>
 							<Box className="w-5 h-5" />
 							<span className="text-sm">Assets</span>
-						</div>
-						<div
+						</button>
+						<button
+							type="button"
 							onClick={() => setCurrentView("predictions")}
 							className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
 								currentView === "predictions"
@@ -92,7 +97,7 @@ export default function Home() {
 						>
 							<Lightbulb className="w-5 h-5" />
 							<span className="text-sm">Predictions</span>
-						</div>
+						</button>
 					</nav>
 
 					<div className="mt-8 pt-4 border-t border-slate-700 space-y-1">
@@ -113,7 +118,8 @@ export default function Home() {
 				<div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur">
 					<div className="px-6 py-4 flex justify-between items-center">
 						<div className="flex gap-6">
-							<div
+							<button
+								type="button"
 								onClick={() => setCurrentView("dashboard")}
 								className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
 									currentView === "dashboard"
@@ -122,8 +128,9 @@ export default function Home() {
 								}`}
 							>
 								DASHBOARD
-							</div>
-							<div
+							</button>
+							<button
+								type="button"
 								onClick={() => setCurrentView("motors")}
 								className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
 									currentView === "motors"
@@ -132,8 +139,9 @@ export default function Home() {
 								}`}
 							>
 								MOTORS
-							</div>
-							<div
+							</button>
+							<button
+								type="button"
 								onClick={() => setCurrentView("alerts")}
 								className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
 									currentView === "alerts"
@@ -142,8 +150,9 @@ export default function Home() {
 								}`}
 							>
 								ALERTS & INCIDENTS
-							</div>
-							<div
+							</button>
+							<button
+								type="button"
 								onClick={() => setCurrentView("assets")}
 								className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
 									currentView === "assets"
@@ -152,8 +161,9 @@ export default function Home() {
 								}`}
 							>
 								ASSET MANAGEMENT
-							</div>
-							<div
+							</button>
+							<button
+								type="button"
 								onClick={() => setCurrentView("predictions")}
 								className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
 									currentView === "predictions"
@@ -162,7 +172,7 @@ export default function Home() {
 								}`}
 							>
 								PREDICTIONS
-							</div>
+							</button>
 						</div>
 						<div className="flex items-center gap-4">
 							<div className="text-xs text-slate-400">
@@ -187,10 +197,16 @@ export default function Home() {
 									</p>
 								</div>
 								<div className="flex gap-3">
-									<button className="px-4 py-2 border border-slate-600 rounded hover:bg-slate-800 text-sm font-medium flex items-center gap-2">
+									<button
+										type="button"
+										className="px-4 py-2 border border-slate-600 rounded hover:bg-slate-800 text-sm font-medium flex items-center gap-2"
+									>
 										⚙️ FILTER
 									</button>
-									<button className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm font-medium flex items-center gap-2">
+									<button
+										type="button"
+										className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+									>
 										↓ EXPORT REPORT
 									</button>
 								</div>
@@ -385,7 +401,10 @@ export default function Home() {
 										</div>
 									</div>
 
-									<button className="w-full mt-2 text-xs text-slate-400 hover:text-slate-300 py-2">
+									<button
+										type="button"
+										className="w-full mt-2 text-xs text-slate-400 hover:text-slate-300 py-2"
+									>
 										VIEW ALL EVENTS
 									</button>
 								</div>
