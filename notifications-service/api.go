@@ -7,12 +7,35 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 )
 
-func startHTTPServer(gdb *gorm.DB) {
+type NotificationResponse struct {
+	ID        int64           `json:"id"`
+	TenantID  string          `json:"tenant_id"`
+	Type      string          `json:"type"`
+	Payload   json.RawMessage `json:"payload"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for WebSocket (adjust as needed)
+	},
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+func startHTTPServer(gdb *gorm.DB, hub *Hub) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/notifications", func(w http.ResponseWriter, r *http.Request) {
+		addCORSHeaders(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -37,7 +60,7 @@ func startHTTPServer(gdb *gorm.DB) {
 			limit = 100
 		}
 
-		var notifs []map[string]interface{}
+		var notifs []NotificationResponse
 
 		err := gdb.Raw(`
 			SELECT id, tenant_id, type, payload, created_at
@@ -53,7 +76,34 @@ func startHTTPServer(gdb *gorm.DB) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
 		json.NewEncoder(w).Encode(notifs)
+	})
+
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		tenantID := r.URL.Query().Get("tenant_id")
+		if tenantID == "" {
+			http.Error(w, "tenant_id is required", http.StatusBadRequest)
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("WebSocket upgrade failed: %v", err)
+			return
+		}
+
+		client := &Client{
+			tenantID: tenantID,
+			conn:     conn,
+			send:     make(chan []byte, 256),
+			hub:      hub,
+		}
+
+		hub.Register(tenantID, client)
+
+		go client.writePump()
+		go client.readPump()
 	})
 
 	server := &http.Server{
@@ -67,4 +117,10 @@ func startHTTPServer(gdb *gorm.DB) {
 			log.Printf("http server failed: %v", err)
 		}
 	}()
+}
+
+func addCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }

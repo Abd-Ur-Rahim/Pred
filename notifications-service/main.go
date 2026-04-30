@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,9 +13,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/segmentio/kafka-go"
 	"gorm.io/gorm"
-	"github.com/joho/godotenv"
 
 	"notifications-service/db"
 )
@@ -57,8 +58,10 @@ func main() {
 	}
 	log.Println("connected to database")
 
+	// Initialize WebSocket hub for broadcasting
+	hub := NewHub()
 
-	startHTTPServer(gdb)
+	startHTTPServer(gdb, hub)
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: strings.Split(brokers, ","),
@@ -80,15 +83,16 @@ func main() {
 			continue
 		}
 
-		if err := handleMessage(ctx, gdb, msg); err != nil {
+		if err := handleMessage(ctx, gdb, hub, msg); err != nil {
 			log.Printf("handle error (offset %d): %v", msg.Offset, err)
 		}
 	}
 }
 
-func handleMessage(ctx context.Context, gdb *gorm.DB, msg kafka.Message) error {
+func handleMessage(ctx context.Context, gdb *gorm.DB, hub *Hub, msg kafka.Message) error {
 	var event AlertEvent
-	if err := json.Unmarshal(msg.Value, &event); err != nil {
+	cleanValue := normalizeKafkaMessage(msg.Value)
+	if err := json.Unmarshal(cleanValue, &event); err != nil {
 		return fmt.Errorf("unmarshal: %w", err)
 	}
 
@@ -120,6 +124,14 @@ func handleMessage(ctx context.Context, gdb *gorm.DB, msg kafka.Message) error {
 	if err != nil {
 		return fmt.Errorf("insert notification: %w", err)
 	}
+
+	// Broadcast new notification to WebSocket clients
+	wsMsg := WSMessage{
+		Type: "new_notification",
+		Data: event.Payload,
+	}
+	msgBytes, _ := json.Marshal(wsMsg)
+	hub.Broadcast(event.TenantID, msgBytes)
 
 	switch event.Type {
 	case "push":
@@ -193,8 +205,6 @@ func sendPush(token, platform string, payload json.RawMessage) error {
 	return nil
 }
 
-
-
 func sendEmail(email string, payload json.RawMessage) error {
 	from := getEnv("EMAIL_USER", "")
 	password := getEnv("EMAIL_PASS", "")
@@ -224,4 +234,10 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func normalizeKafkaMessage(raw []byte) []byte {
+	// Trim UTF-8 BOM and leading/trailing whitespace that can appear in CLI-produced messages.
+	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
+	return bytes.TrimSpace(raw)
 }
