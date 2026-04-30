@@ -4,7 +4,7 @@ Simple Go service for ingestion endpoints.
 
 ## Prerequisites
 
-- Go 1.22+ (or any recent stable Go version)
+- Go (use the version declared in `go.mod`)
 
 ## Setup
 
