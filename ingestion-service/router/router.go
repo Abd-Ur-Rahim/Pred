@@ -13,6 +13,6 @@ func NewRouter() *gin.Engine {
 	r.POST("/devices", handlers.RegisterDevice)
 	r.GET("/devices", handlers.GetDevices)
 	r.GET("/devices/:id", handlers.GetDeviceByID)
-	
+
 	return r
 }

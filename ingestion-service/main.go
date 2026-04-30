@@ -27,7 +27,7 @@ func main() {
 		log.Fatal("Database connection not established")
 	}
 
-	// Migrate the schema 
+	// Migrate the schema
 	if err := gdb.AutoMigrate(&db.Device{}); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}

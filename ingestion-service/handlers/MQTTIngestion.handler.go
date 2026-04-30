@@ -16,7 +16,7 @@ func SetKafkaProducer(producer *services.KafkaProducer) {
 	kafkaProducer = producer
 }
 
-// TODO: Need to check the deviceID with the database and only publish to Kafka if the device is registered. 
+// TODO: Need to check the deviceID with the database and only publish to Kafka if the device is registered.
 // This will prevent unregistered devices from flooding Kafka with data.
 func HandleMQTTMessage(_ mqtt.Client, msg mqtt.Message) {
 	deviceID := extractDeviceIDFromTopic(msg.Topic())
