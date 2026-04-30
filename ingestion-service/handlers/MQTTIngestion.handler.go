@@ -19,14 +19,13 @@ func SetKafkaProducer(producer *services.KafkaProducer) {
 // TODO: Need to check the deviceID with the database and only publish to Kafka if the device is registered. 
 // This will prevent unregistered devices from flooding Kafka with data.
 func HandleMQTTMessage(_ mqtt.Client, msg mqtt.Message) {
-	log.Printf("mqtt message received: topic=%s payload=%s", msg.Topic(), string(msg.Payload()))
+	deviceID := extractDeviceIDFromTopic(msg.Topic())
+	log.Printf("mqtt message received: topic=%s deviceID=%s payload_bytes=%d", msg.Topic(), deviceID, len(msg.Payload()))
 
 	if kafkaProducer == nil {
 		log.Printf("kafka producer is not initialized; skipping publish")
 		return
 	}
-
-	deviceID := extractDeviceIDFromTopic(msg.Topic())
 	if err := kafkaProducer.Publish(context.Background(), deviceID, msg.Payload()); err != nil {
 		log.Printf("failed to publish message to kafka: %v", err)
 		return
