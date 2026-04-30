@@ -122,26 +122,6 @@ const getSeverityColor = (severity: string) => {
 	}
 };
 
-const getSeverityBgColor = (severity: string) => {
-	switch (severity) {
-		case "CRITICAL":
-			return "bg-red-500/10 text-red-500";
-		case "WARNING":
-			return "bg-orange-500/10 text-orange-500";
-		case "INFO":
-			return "bg-blue-500/10 text-blue-500";
-		default:
-			return "bg-gray-500/10 text-gray-500";
-	}
-};
-
-const getStatusColor = (status: string) => {
-	if (status.includes("UNACKNOWLEDGED")) return "text-red-500";
-	if (status.includes("ACKNOWLEDGED")) return "text-green-500";
-	if (status.includes("RESCUED")) return "text-blue-500";
-	return "text-gray-500";
-};
-
 const getFormattedTime = () => {
 	const now = new Date();
 	const year = now.getFullYear();
