@@ -11,7 +11,7 @@ type Device struct {
 }
 
 func AddDevice(device *Device) error {
-	result := db.ORM.Create(&device)
+	result := db.ORM.Create(device)
 	return result.Error
 }
 
