@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"ingestion-service/models"
+	"ingestion-service/db"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 func RegisterDevice(c *gin.Context) {
-	var device models.Device
+	var device db.Device
 	if err := c.ShouldBindJSON(&device); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
 		return
@@ -23,7 +23,7 @@ func RegisterDevice(c *gin.Context) {
 		return
 	}
 
-	if err := models.AddDevice(&device); err != nil {
+	if err := db.AddDevice(&device); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register device"})
 		return
 	}
@@ -44,7 +44,7 @@ func GetDevices(c *gin.Context) {
 		return
 	}
 
-	devices, err := models.GetAllDevicesByTenantID(uint(tenantID64))
+	devices, err := db.GetAllDevicesByTenantID(uint(tenantID64))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve devices"})
 		return
@@ -61,7 +61,7 @@ func GetDeviceByID(c *gin.Context) {
 		return
 	}
 
-	device, err := models.GetDeviceByID(uint(id64))
+	device, err := db.GetDeviceByID(uint(id64))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})

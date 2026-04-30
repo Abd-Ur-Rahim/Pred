@@ -1,36 +1,22 @@
 package db
 
 import (
-	"fmt"
-	"log"
+	"context"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
+// ORM kept for backward compatibility with existing code.
 var ORM *gorm.DB
 
-func GetDB() *gorm.DB {
-	return ORM
-}
-
-func InitDB(user, password, dbName, host, port string) {
-	var err error
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbName)
-	ORM, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+// Open opens a GORM DB connection using the provided DSN and returns the *gorm.DB.
+// It also sets the package-level `ORM` variable for compatibility.
+func Open(ctx context.Context, url string) (*gorm.DB, error) {
+	gdb, err := gorm.Open(postgres.Open(url), &gorm.Config{})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	db, err := ORM.DB()
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	println("Connected to database")
+	ORM = gdb
+	return gdb, nil
 }
