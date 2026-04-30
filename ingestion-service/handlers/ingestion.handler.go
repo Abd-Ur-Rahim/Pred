@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"ingestion-service/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func RegisterDevice(c *gin.Context) {
@@ -61,7 +63,12 @@ func GetDeviceByID(c *gin.Context) {
 
 	device, err := models.GetDeviceByID(uint(id64))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device"})
 		return
 	}
 

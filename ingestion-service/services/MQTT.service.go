@@ -50,7 +50,9 @@ func PublishMQTTMessage(client mqtt.Client, topic string, payload []byte) error 
 	}
 
 	token := client.Publish(topic, 0, false, payload)
-	token.Wait()
+	if !token.WaitTimeout(10 * time.Second) {
+		return errors.New("timed out waiting for mqtt publish to complete")
+	}
 	return token.Error()
 }
 
@@ -60,7 +62,9 @@ func SubscribeMQTTTopic(client mqtt.Client, topic string, handler mqtt.MessageHa
 	}
 
 	token := client.Subscribe(topic, 0, handler)
-	token.Wait()
+	if !token.WaitTimeout(10 * time.Second) {
+		return errors.New("timed out waiting for mqtt subscribe to complete")
+	}
 	return token.Error()
 }
 
