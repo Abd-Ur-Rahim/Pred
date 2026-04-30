@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/smtp"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -55,6 +57,9 @@ func main() {
 	}
 	log.Println("connected to database")
 
+
+	startHTTPServer(gdb)
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: strings.Split(brokers, ","),
 		Topic:   topic,
@@ -87,6 +92,30 @@ func handleMessage(ctx context.Context, gdb *gorm.DB, msg kafka.Message) error {
 		return fmt.Errorf("unmarshal: %w", err)
 	}
 
+	if event.TenantID == "" {
+		return fmt.Errorf("missing tenant_id")
+	}
+	if len(event.Recipients) == 0 {
+		return fmt.Errorf("missing recipients")
+	}
+	if event.Type != "push" && event.Type != "email" {
+		return fmt.Errorf("unknown notification type %q", event.Type)
+	}
+
+	var payloadMap map[string]interface{}
+	if len(event.Payload) > 0 {
+		if err := json.Unmarshal(event.Payload, &payloadMap); err != nil {
+			return fmt.Errorf("invalid payload: %w", err)
+		}
+	}
+
+	if prob, ok := payloadMap["failure_probability"].(float64); ok {
+		if prob < failureThreshold() {
+			log.Println("skipping low-risk event")
+			return nil
+		}
+	}
+
 	notifID, err := db.InsertNotification(ctx, gdb, event.TenantID, event.Type, event.Payload)
 	if err != nil {
 		return fmt.Errorf("insert notification: %w", err)
@@ -97,9 +126,9 @@ func handleMessage(ctx context.Context, gdb *gorm.DB, msg kafka.Message) error {
 		return fanOutPush(ctx, gdb, notifID, event)
 	case "email":
 		return fanOutEmail(ctx, gdb, notifID, event)
-	default:
-		return fmt.Errorf("unknown notification type %q", event.Type)
 	}
+
+	return nil
 }
 
 func fanOutPush(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEvent) error {
@@ -135,6 +164,11 @@ func fanOutPush(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEve
 
 func fanOutEmail(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEvent) error {
 	for _, r := range event.Recipients {
+		if r.Email == "" {
+			log.Printf("skipping recipient with empty email (user %s)", r.UserID)
+			continue
+		}
+
 		deliveryID, err := db.InsertDelivery(ctx, gdb, notifID, event.TenantID, r.UserID, r.Email, nil)
 		if err != nil {
 			log.Printf("insert delivery failed (user %s, email %s): %v", r.UserID, r.Email, err)
@@ -155,13 +189,34 @@ func fanOutEmail(ctx context.Context, gdb *gorm.DB, notifID int64, event AlertEv
 }
 
 func sendPush(token, platform string, payload json.RawMessage) error {
-	log.Printf("push → %s (%s)", token, platform)
+	log.Printf("push -> %s (%s)", token, platform)
 	return nil
 }
 
+
+
 func sendEmail(email string, payload json.RawMessage) error {
-	log.Printf("email → %s", email)
-	return nil
+	from := getEnv("EMAIL_USER", "")
+	password := getEnv("EMAIL_PASS", "")
+
+	msg := "Subject: Machine Alert\n\n" + string(payload)
+
+	return smtp.SendMail(
+		"smtp.gmail.com:587",
+		smtp.PlainAuth("", from, password, "smtp.gmail.com"),
+		from,
+		[]string{email},
+		[]byte(msg),
+	)
+}
+
+func failureThreshold() float64 {
+	v := getEnv("FAILURE_THRESHOLD", "0.8")
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || f < 0 || f > 1 {
+		return 0.8
+	}
+	return f
 }
 
 func getEnv(key, fallback string) string {
