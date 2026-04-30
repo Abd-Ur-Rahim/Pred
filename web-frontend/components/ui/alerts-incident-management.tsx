@@ -181,13 +181,48 @@ export function AlertsIncidentManagement() {
 		return () => clearInterval(interval);
 	}, [autoGenerateEnabled, nextAlertId]);
 
-	// Filter alerts based on severity filter
-	const filteredAlerts = severityFilter
-		? allAlerts.filter((alert) => alert.severity === severityFilter)
-		: allAlerts;
+	const assetGroupPrefixMap: Record<string, string> = {
+		"ALL ASSETS": "",
+		TURBINES: "TURB",
+		PUMPS: "PUMP",
+		COMPRESSORS: "COMPRESSOR",
+		"HVAC SYSTEMS": "HVAC",
+	};
+
+	const getTimeRangeMs = (value: string): number | null => {
+		const normalized = value.trim().toUpperCase();
+		const num = Number.parseInt(normalized, 10);
+		if (normalized.includes("HOUR")) return num * 60 * 60 * 1000;
+		if (normalized.includes("DAY")) return num * 24 * 60 * 60 * 1000;
+		if (normalized.includes("WEEK")) return num * 7 * 24 * 60 * 60 * 1000;
+		return null;
+	};
+
+	// Filter alerts based on all active UI filters
+	const filteredAlerts = allAlerts.filter((alert) => {
+		const matchesSeverity =
+			!severityFilter || alert.severity === severityFilter;
+
+		const prefix = assetGroupPrefixMap[assetGroupFilter] ?? "";
+		const matchesAssetGroup = !prefix || alert.asset.startsWith(prefix);
+
+		const timeRangeMs = getTimeRangeMs(timeRange);
+		let matchesTimeRange = true;
+		if (timeRangeMs !== null) {
+			const detectedTime = new Date(alert.timeDetected);
+			if (!Number.isNaN(detectedTime.getTime())) {
+				matchesTimeRange = Date.now() - detectedTime.getTime() <= timeRangeMs;
+			}
+		}
+
+		return matchesSeverity && matchesAssetGroup && matchesTimeRange;
+	});
 
 	const itemsPerPage = 5;
-	const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filteredAlerts.length / itemsPerPage),
+	);
 
 	const unacknowledgedCount = allAlerts.filter(
 		(alert) => !acknowledgedAlerts.has(alert.id),
@@ -265,6 +300,7 @@ export function AlertsIncidentManagement() {
 								{ label: "INFO", value: "INFO", count: infoCount },
 							].map((severity) => (
 								<button
+									type="button"
 									key={severity.value}
 									onClick={() =>
 										setSeverityFilter(
@@ -294,7 +330,10 @@ export function AlertsIncidentManagement() {
 						</label>
 						<select
 							value={assetGroupFilter}
-							onChange={(e) => setAssetGroupFilter(e.target.value)}
+							onChange={(e) => {
+								setAssetGroupFilter(e.target.value);
+								setCurrentPage(1);
+							}}
 							className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
 						>
 							<option>ALL ASSETS</option>
@@ -312,7 +351,10 @@ export function AlertsIncidentManagement() {
 						</label>
 						<select
 							value={timeRange}
-							onChange={(e) => setTimeRange(e.target.value)}
+							onChange={(e) => {
+								setTimeRange(e.target.value);
+								setCurrentPage(1);
+							}}
 							className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
 						>
 							<option>LAST 24 HOURS</option>
@@ -340,18 +382,26 @@ export function AlertsIncidentManagement() {
 					{ label: "CRITICAL", count: criticalCount },
 					{ label: "WARNING", count: warningCount },
 					{ label: "INFO", count: infoCount },
-				].map((tab) => (
-					<button
-						key={tab.label}
-						className={`px-4 py-2 text-sm font-medium transition-colors ${
-							tab.label === "CRITICAL"
-								? "text-orange-400 border-b-2 border-orange-400"
-								: "text-slate-400 hover:text-slate-300"
-						}`}
-					>
-						{tab.label} ({tab.count})
-					</button>
-				))}
+				].map((tab) => {
+					const isActive = severityFilter === tab.label;
+					return (
+						<button
+							type="button"
+							key={tab.label}
+							onClick={() => {
+								setSeverityFilter(isActive ? null : tab.label);
+								setCurrentPage(1);
+							}}
+							className={`px-4 py-2 text-sm font-medium transition-colors ${
+								isActive
+									? "text-orange-400 border-b-2 border-orange-400"
+									: "text-slate-400 hover:text-slate-300"
+							}`}
+						>
+							{tab.label} ({tab.count})
+						</button>
+					);
+				})}
 			</div>
 
 			<div className="grid grid-cols-3 gap-6">
@@ -497,67 +547,73 @@ export function AlertsIncidentManagement() {
 							</tr>
 						</thead>
 						<tbody>
-							{filteredAlerts.map((alert) => {
-								const isAcknowledged = acknowledgedAlerts.has(alert.id);
-								return (
-									<tr
-										key={alert.id}
-										onClick={() => setSelectedAlert(alert)}
-										className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
-											selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
-										} ${isAcknowledged ? "opacity-60" : ""}`}
-									>
-										<td className="px-4 py-3 font-mono text-xs text-slate-300">
-											{alert.id}
-										</td>
-										<td className="px-4 py-3 font-mono text-xs text-slate-300">
-											{alert.asset}
-										</td>
-										<td className="px-4 py-3">
-											<span
-												className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
-											>
-												{alert.severity}
-											</span>
-										</td>
-										<td className="px-4 py-3 text-xs text-slate-300">
-											{alert.type}
-										</td>
-										<td className="px-4 py-3 font-mono text-xs text-slate-400">
-											{alert.timeDetected}
-										</td>
-										<td className="px-4 py-3">
-											<div className="flex items-center gap-1">
-												<div
-													className={`w-2 h-2 rounded-full ${
-														isAcknowledged ? "bg-green-500" : "bg-red-500"
-													}`}
-												></div>
+							{filteredAlerts
+								.slice(
+									(currentPage - 1) * itemsPerPage,
+									currentPage * itemsPerPage,
+								)
+								.map((alert) => {
+									const isAcknowledged = acknowledgedAlerts.has(alert.id);
+									return (
+										<tr
+											key={alert.id}
+											onClick={() => setSelectedAlert(alert)}
+											className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+												selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
+											} ${isAcknowledged ? "opacity-60" : ""}`}
+										>
+											<td className="px-4 py-3 font-mono text-xs text-slate-300">
+												{alert.id}
+											</td>
+											<td className="px-4 py-3 font-mono text-xs text-slate-300">
+												{alert.asset}
+											</td>
+											<td className="px-4 py-3">
 												<span
-													className={`text-xs font-semibold ${
-														isAcknowledged ? "text-green-500" : "text-red-500"
-													}`}
+													className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
 												>
-													{isAcknowledged ? "ACKNOWLEDGED" : "UNACKNOWLEDGED"}
+													{alert.severity}
 												</span>
-											</div>
-										</td>
-										<td className="px-4 py-3">
-											{!isAcknowledged && (
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														handleAcknowledgeAlert(alert.id);
-													}}
-													className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
-												>
-													ACKNOWLEDGE
-												</button>
-											)}
-										</td>
-									</tr>
-								);
-							})}
+											</td>
+											<td className="px-4 py-3 text-xs text-slate-300">
+												{alert.type}
+											</td>
+											<td className="px-4 py-3 font-mono text-xs text-slate-400">
+												{alert.timeDetected}
+											</td>
+											<td className="px-4 py-3">
+												<div className="flex items-center gap-1">
+													<div
+														className={`w-2 h-2 rounded-full ${
+															isAcknowledged ? "bg-green-500" : "bg-red-500"
+														}`}
+													></div>
+													<span
+														className={`text-xs font-semibold ${
+															isAcknowledged ? "text-green-500" : "text-red-500"
+														}`}
+													>
+														{isAcknowledged ? "ACKNOWLEDGED" : "UNACKNOWLEDGED"}
+													</span>
+												</div>
+											</td>
+											<td className="px-4 py-3">
+												{!isAcknowledged && (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleAcknowledgeAlert(alert.id);
+														}}
+														className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
+													>
+														ACKNOWLEDGE
+													</button>
+												)}
+											</td>
+										</tr>
+									);
+								})}
 						</tbody>
 					</table>
 				</div>
@@ -565,11 +621,16 @@ export function AlertsIncidentManagement() {
 				{/* Pagination */}
 				<div className="flex justify-between items-center px-4 py-3 border-t border-slate-700 bg-slate-900/50">
 					<span className="text-xs text-slate-400">
-						DISPLAYING {(currentPage - 1) * itemsPerPage + 1} OF{" "}
+						DISPLAYING{" "}
+						{filteredAlerts.length === 0
+							? 0
+							: (currentPage - 1) * itemsPerPage + 1}
+						–{Math.min(currentPage * itemsPerPage, filteredAlerts.length)} OF{" "}
 						{filteredAlerts.length} INCIDENTS
 					</span>
 					<div className="flex gap-2">
 						<button
+							type="button"
 							onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
 							disabled={currentPage === 1}
 							className="p-1 hover:bg-slate-700 disabled:opacity-50 rounded"
@@ -580,6 +641,7 @@ export function AlertsIncidentManagement() {
 							{currentPage}
 						</span>
 						<button
+							type="button"
 							onClick={() =>
 								setCurrentPage(Math.min(totalPages, currentPage + 1))
 							}
