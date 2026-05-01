@@ -1,14 +1,18 @@
 package services
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-func CreateMQTTClient(broker, clientID, username, password string) mqtt.Client {
+func CreateMQTTClient(broker, clientID, username, password, caCertPath string) (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(broker)
 	opts.SetClientID(clientID)
@@ -26,7 +30,37 @@ func CreateMQTTClient(broker, clientID, username, password string) mqtt.Client {
 		fmt.Printf("MQTT connection lost: %v\n", err)
 	})
 
-	return mqtt.NewClient(opts)
+	if strings.HasPrefix(broker, "ssl://") || strings.HasPrefix(broker, "tls://") {
+		tlsConfig, err := createTLSConfig(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("configure MQTT TLS: %w", err)
+		}
+		opts.SetTLSConfig(tlsConfig)
+	}
+
+	return mqtt.NewClient(opts), nil
+}
+
+func createTLSConfig(caCertPath string) (*tls.Config, error) {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		certPool = x509.NewCertPool()
+	}
+
+	if caCertPath != "" {
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("read MQTT CA certificate: %w", err)
+		}
+		if ok := certPool.AppendCertsFromPEM(caCert); !ok {
+			return nil, errors.New("append MQTT CA certificate")
+		}
+	}
+
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certPool,
+	}, nil
 }
 
 func ConnectMQTTClient(client mqtt.Client) error {
