@@ -3,43 +3,114 @@ package handlers
 import (
 	"context"
 	"log"
-	"strings"
+	"strconv"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
+	"ingestion-service/db"
 	"ingestion-service/services"
 )
 
 var kafkaProducer *services.KafkaProducer
+var redisCache *services.RedisCache
 
 func SetKafkaProducer(producer *services.KafkaProducer) {
 	kafkaProducer = producer
 }
 
-// TODO: Need to check the deviceID with the database and only publish to Kafka if the device is registered.
-// This will prevent unregistered devices from flooding Kafka with data.
-func HandleMQTTMessage(_ mqtt.Client, msg mqtt.Message) {
-	deviceID := extractDeviceIDFromTopic(msg.Topic())
-	log.Printf("mqtt message received: topic=%s deviceID=%s payload_bytes=%d", msg.Topic(), deviceID, len(msg.Payload()))
+func SetRedisCache(cache *services.RedisCache) {
+	redisCache = cache
+}
 
+// HandleMQTTMessage is the single MQTT entrypoint.
+// It parses topic once, then dispatches work based on the topic kind.
+func HandleMQTTMessage(client mqtt.Client, msg mqtt.Message) {
+	deviceID, topicKind, err := parseDeviceTopic(msg.Topic())
+	if err != nil {
+		log.Printf("invalid mqtt topic: %s: %v", msg.Topic(), err)
+		return
+	}
+
+	log.Printf("mqtt message received: topic=%s kind=%s deviceID=%d payload_bytes=%d", msg.Topic(), topicKind, deviceID, len(msg.Payload()))
+
+	switch topicKind {
+	case mqttTopicRegistration:
+		HandleMQTTDeviceRegistrationWithTemplate(client, msg, registrationResponseTopicTemplate)
+	case mqttTopicData:
+		handleMQTTDataMessage(deviceID, msg)
+	default:
+		log.Printf("unsupported mqtt topic kind: %s", topicKind)
+	}
+}
+
+func handleMQTTDataMessage(deviceID uint, msg mqtt.Message) {
+	fallbackPublicKey, ok := loadActiveDevicePublicKey(deviceID)
+	if !ok {
+		return
+	}
+
+	err := verifyDeviceData(deviceID, fallbackPublicKey, msg.Payload())
+	if err != nil {
+		log.Printf("failed to verify/process device data: device_id=%d err=%v", deviceID, err)
+		return
+	}
+
+	// Publish to Kafka
 	if kafkaProducer == nil {
 		log.Printf("kafka producer is not initialized; skipping publish")
 		return
 	}
-	if err := kafkaProducer.Publish(context.Background(), deviceID, msg.Payload()); err != nil {
+
+	deviceKey := strconv.FormatUint(uint64(deviceID), 10)
+	if err := kafkaProducer.Publish(context.Background(), deviceKey, msg.Payload()); err != nil {
 		log.Printf("failed to publish message to kafka: %v", err)
 		return
 	}
 
-	log.Printf("published message to kafka with key=%s", deviceID)
+	log.Printf("published message to kafka with key=%s", deviceKey)
 }
 
-// sample topic: devices/{deviceID}/data
-func extractDeviceIDFromTopic(topic string) string {
-	parts := strings.Split(topic, "/")
-	if len(parts) >= 2 && parts[0] == "devices" {
-		return parts[1]
+func loadActiveDevicePublicKey(deviceID uint) (*string, bool) {
+	if redisCache != nil {
+		isActive, publicKey, found, err := redisCache.GetDeviceState(context.Background(), deviceID)
+		if err != nil {
+			log.Printf("failed to read device state cache: device_id=%d err=%v", deviceID, err)
+		} else if found {
+			if !isActive {
+				log.Printf("device is inactive: device_id=%d", deviceID)
+				return nil, false
+			}
+			if publicKey == "" {
+				log.Printf("device has no public key registered: device_id=%d", deviceID)
+				return nil, false
+			}
+
+			cachedKey := publicKey
+			return &cachedKey, true
+		}
 	}
 
-	return topic
+	device, err := db.GetDeviceByID(deviceID)
+	if err != nil {
+		log.Printf("device not found: device_id=%d err=%v", deviceID, err)
+		return nil, false
+	}
+
+	if !device.IsActive {
+		log.Printf("device is inactive: device_id=%d", deviceID)
+		return nil, false
+	}
+
+	if device.PublicKey == nil {
+		log.Printf("device has no public key registered: device_id=%d", deviceID)
+		return nil, false
+	}
+
+	if redisCache != nil {
+		if err := redisCache.CacheDeviceState(context.Background(), deviceID, device.IsActive, *device.PublicKey); err != nil {
+			log.Printf("failed to cache device state: device_id=%d err=%v", deviceID, err)
+		}
+	}
+
+	return device.PublicKey, true
 }
