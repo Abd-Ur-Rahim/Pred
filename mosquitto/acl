@@ -1,0 +1,6 @@
+user pred-device
+topic write devices/+/data
+
+user pred-ingestion
+topic read devices/+/data
+topic read $SYS/broker/version
