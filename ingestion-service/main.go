@@ -9,6 +9,7 @@ import (
 	"ingestion-service/router"
 	"ingestion-service/services"
 	"log"
+	"time"
 )
 
 func main() {
@@ -40,6 +41,32 @@ func main() {
 		}
 	}()
 
+	pubKeyTTL, err := time.ParseDuration(config.RedisPubKeyTTL)
+	if err != nil {
+		log.Fatalf("Invalid REDIS_PUBKEY_TTL: %v", err)
+	}
+	nonceTTL, err := time.ParseDuration(config.RedisNonceTTL)
+	if err != nil {
+		log.Fatalf("Invalid REDIS_NONCE_TTL: %v", err)
+	}
+
+	redisCache, err := services.NewRedisCache(
+		config.RedisAddr,
+		config.RedisPassword,
+		config.RedisDB,
+		pubKeyTTL,
+		nonceTTL,
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize Redis cache: %v", err)
+	}
+	handlers.SetRedisCache(redisCache)
+	defer func() {
+		if err := redisCache.Close(); err != nil {
+			log.Printf("Failed to close Redis cache: %v", err)
+		}
+	}()
+
 	mqttClient, err := services.CreateMQTTClient(
 		config.MQTTBroker,
 		config.MQTTClientID,
@@ -55,11 +82,12 @@ func main() {
 		log.Fatalf("MQTT connection failed: %v", err)
 	}
 
-	if err := services.SubscribeMQTTTopic(mqttClient, config.MQTTTopic, handlers.HandleMQTTMessage); err != nil {
+	handlers.SetRegistrationResponseTopicTemplate(config.MQTTDeviceRegistrationResponseTopic)
+	if err := services.SubscribeMQTTTopic(mqttClient, "devices/+/+", handlers.HandleMQTTMessage); err != nil {
 		log.Fatalf("MQTT subscribe failed: %v", err)
 	}
 	defer services.DisconnectMQTTClient(mqttClient)
 
-	r := router.NewRouter()
+	r := router.NewRouter(gdb)
 	log.Fatal(r.Run(fmt.Sprintf(":%s", config.Port)))
 }
