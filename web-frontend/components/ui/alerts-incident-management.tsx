@@ -507,67 +507,72 @@ export function AlertsIncidentManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredAlerts.map((alert) => {
-                const isAcknowledged = acknowledgedAlerts.has(alert.id);
-                return (
-                  <tr
-                    key={alert.id}
-                    onClick={() => setSelectedAlert(alert)}
-                    className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
-                      selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
-                    } ${isAcknowledged ? "opacity-60" : ""}`}
-                  >
-                    <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                      {alert.id}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                      {alert.asset}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
-                      >
-                        {alert.severity}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-300">
-                      {alert.type}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">
-                      {alert.timeDetected}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            isAcknowledged ? "bg-green-500" : "bg-red-500"
-                          }`}
-                        ></div>
+              {filteredAlerts
+                .slice(
+                  (currentPage - 1) * itemsPerPage,
+                  currentPage * itemsPerPage,
+                )
+                .map((alert) => {
+                  const isAcknowledged = acknowledgedAlerts.has(alert.id);
+                  return (
+                    <tr
+                      key={alert.id}
+                      onClick={() => setSelectedAlert(alert)}
+                      className={`border-b border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                        selectedAlert.id === alert.id ? "bg-slate-700/50" : ""
+                      } ${isAcknowledged ? "opacity-60" : ""}`}
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                        {alert.id}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                        {alert.asset}
+                      </td>
+                      <td className="px-4 py-3">
                         <span
-                          className={`text-xs font-semibold ${
-                            isAcknowledged ? "text-green-500" : "text-red-500"
-                          }`}
+                          className={`text-xs font-semibold ${getSeverityColor(alert.severity)}`}
                         >
-                          {isAcknowledged ? "ACKNOWLEDGED" : "UNACKNOWLEDGED"}
+                          {alert.severity}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {!isAcknowledged && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAcknowledgeAlert(alert.id);
-                          }}
-                          className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
-                        >
-                          ACKNOWLEDGE
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-300">
+                        {alert.type}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                        {alert.timeDetected}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              isAcknowledged ? "bg-green-500" : "bg-red-500"
+                            }`}
+                          ></div>
+                          <span
+                            className={`text-xs font-semibold ${
+                              isAcknowledged ? "text-green-500" : "text-red-500"
+                            }`}
+                          >
+                            {isAcknowledged ? "ACKNOWLEDGED" : "UNACKNOWLEDGED"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {!isAcknowledged && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAcknowledgeAlert(alert.id);
+                            }}
+                            className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
+                          >
+                            ACKNOWLEDGE
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
