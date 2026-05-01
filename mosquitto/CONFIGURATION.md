@@ -1,13 +1,19 @@
 # Mosquitto Configuration Guide
 
 The MQTT broker is provisioned automatically by the `mosquitto` service in
-`docker-compose.yml`. Its entrypoint (`mosquitto/entrypoint.sh`) creates the
-password database from environment variables, then starts Mosquitto with
-`mosquitto/mosquitto.conf`.
+`docker-compose.yml`. Its entrypoint (`mosquitto/entrypoint.sh`) checks that
+TLS certificates exist, creates the password database from environment
+variables, then starts Mosquitto with `mosquitto/mosquitto.conf`.
+
+Mosquitto is responsible for encrypted transport, username/password
+authentication, and topic ACLs. It does not validate device IDs, payload
+signatures, timestamps, or nonces. Those checks belong in the ingestion service
+because ingestion can use the server database and Redis/device-key cache.
 
 ## What gets configured
 
-- **Broker listener:** `0.0.0.0:1883`
+- **Broker listener:** `0.0.0.0:8883` using MQTTS
+- **TLS files:** `mosquitto/certs/ca.crt`, `server.crt`, and `server.key`
 - **Anonymous access:** disabled
 - **Password database:** generated at `/mosquitto/data/passwords` inside the
   `mosquitto_data` Docker volume
@@ -32,8 +38,20 @@ docker compose logs -f mosquitto
 The broker is available at:
 
 ```text
-tcp://localhost:1883
+ssl://localhost:8883
 ```
+
+The container will not start until these files exist:
+
+```text
+mosquitto/certs/ca.crt
+mosquitto/certs/server.crt
+mosquitto/certs/server.key
+```
+
+If you use the same certificate authority and certificate process as HTTPS,
+make sure the broker certificate includes the MQTT hostname in its SAN list,
+for example `localhost`, `mosquitto`, or your production MQTT domain.
 
 ## Overriding the dev credentials
 
@@ -56,6 +74,8 @@ docker compose up -d --force-recreate mosquitto
 Update `ingestion-service/.env` with the ingestion credential:
 
 ```env
+MQTT_BROKER=ssl://localhost:8883
+MQTT_CA_CERT=../mosquitto/certs/ca.crt
 MQTT_USERNAME=pred-ingestion
 MQTT_PASSWORD=<ingestion-password>
 ```
@@ -66,7 +86,8 @@ Subscribe as the ingestion service:
 
 ```sh
 docker compose exec mosquitto mosquitto_sub \
-  -h localhost -p 1883 \
+  -h localhost -p 8883 \
+  --cafile /mosquitto/config/certs/ca.crt \
   -u pred-ingestion -P dev-ingestion-password \
   -t 'devices/+/data'
 ```
@@ -75,7 +96,8 @@ Publish as a device:
 
 ```sh
 docker compose exec mosquitto mosquitto_pub \
-  -h localhost -p 1883 \
+  -h localhost -p 8883 \
+  --cafile /mosquitto/config/certs/ca.crt \
   -u pred-device -P dev-device-password \
   -t 'devices/device-001/data' \
   -m '{"temperature":72.4}'
@@ -84,11 +106,15 @@ docker compose exec mosquitto mosquitto_pub \
 ## Troubleshooting
 
 **Connection refused:** check that `docker compose ps mosquitto` shows the
-container as healthy and that port `1883` is not already in use.
+container as healthy and that port `8883` is not already in use.
 
 **Authentication failed:** recreate the broker after changing credential
 environment variables. The password database is regenerated on container start.
 
-**Ingestion service cannot connect:** use `tcp://localhost:1883` when running
-the ingestion service locally with `go run .`. Use `tcp://mosquitto:1883` only
+**Certificate verification failed:** confirm the ingestion service has
+`MQTT_CA_CERT` pointing at the CA that signed the broker certificate, and that
+the certificate SAN matches the hostname in `MQTT_BROKER`.
+
+**Ingestion service cannot connect:** use `ssl://localhost:8883` when running
+the ingestion service locally with `go run .`. Use `ssl://mosquitto:8883` only
 when the ingestion service runs inside Docker Compose.
