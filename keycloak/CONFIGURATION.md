@@ -1,269 +1,51 @@
 # Keycloak Configuration Guide
 
-Step-by-step instructions for configuring Keycloak to work with the Pred application.
+The realm, client, and a test user are provisioned automatically by the
+`keycloak` service in `docker-compose.yml`. Its entrypoint
+(`keycloak/entrypoint.sh`) starts Keycloak in the background and runs
+`keycloak/configure.sh` against the admin API once it's reachable. The script
+is idempotent — re-running it is a no-op.
 
-## Accessing Keycloak Admin Panel
+## What gets provisioned
 
-### Prerequisites
+- **Realm:** `prod-maintenance` (password policy: `length(8) and specialChars(1) and digits(1)`, brute-force protection on)
+- **Client scope:** `tenant` with a `tenant_id` user-attribute mapper, attached as a default scope on the client so `tenant_id` is in every token.
+- **Client:** `web-frontend` (confidential, standard flow only) with:
+  - Redirect URI: `http://localhost:3000/api/auth/callback/keycloak`
+  - Web origin: `http://localhost:3000`
+  - Secret: `dev-web-frontend-secret` (fixed dev value — see "Overriding the dev secret" below)
+- **Test user:** `testuser` / `Test123!`, with attribute `tenant_id=tenant-001`.
 
-Keycloak must be running:
+## Running it
 
-```bash
-docker compose up -d keycloak postgres
-sleep 30
+```sh
+docker compose up -d
+docker compose logs -f keycloak
 ```
 
-### Login to Admin Dashboard
+Look for `[keycloak-config] configuration complete` in the logs. The Keycloak admin UI
+is at http://localhost:8080 (`admin` / `changeme`).
 
-1. Open browser: **http://localhost:8080**
-2. Click **Administration Console** (bottom right corner)
-3. Login with:
-   - **Username:** `admin`
-   - **Password:** `changeme`
+## Overriding the dev secret
 
----
+The default secret (`dev-web-frontend-secret`) is hard-coded into
+`web-frontend/.env.example` so a fresh checkout works without manual steps. To
+change it:
 
-## Creating a Client for Web Frontend
+1. Set `KEYCLOAK_CLIENT_SECRET` in the environment used by `docker compose`
+   (e.g. a top-level `.env` file).
+2. Set the same value in `web-frontend/.env.local` as `KEYCLOAK_CLIENT_SECRET`.
+3. `docker compose up -d --force-recreate keycloak` to re-run the script — it
+   will update the existing client's secret.
 
-A "Client" in Keycloak represents your application. Create one so Keycloak knows how to handle login requests from your Next.js app.
+## Adding more users
 
-### Step 1: Create New Client
-
-1. Navigate to **Clients** (left sidebar)
-2. Click **Create client** button (top right)
-3. Fill in:
-   - **Client ID:** `web-frontend`
-   - **Name:** `Pred Web Frontend`
-   - **Client type:** `OpenID Connect`
-4. Click **Next**
-
-### Step 2: Configure Capabilities
-
-Keep defaults:
-- Access Type: `Confidential` (auto-selected)
-- Client authentication: `ON`
-- Authorization: `OFF`
-- Click **Save**
-
-### Step 3: Set Redirect URIs
-
-After saving, view the client details:
-
-1. Scroll to **Login settings** section
-2. Set **Valid redirect URIs:**
-   ```
-   http://localhost:3000/api/auth/callback/keycloak
-   ```
-   (This is the NextAuth callback URL — it's required)
-
-3. Set **Valid post logout redirect URIs:**
-   ```
-   http://localhost:3000/login
-   http://localhost:3000/
-   ```
-
-4. Click **Save**
-
-### Step 4: Get Client Secret
-
-1. Click **Credentials** tab
-2. Under "Client secret" you'll see a generated value
-3. **Copy this value**
-4. Paste it in `web-frontend/.env.local`:
-   ```env
-   KEYCLOAK_CLIENT_SECRET=<paste-here>
-   ```
-
----
-
-## Creating Test Users
-
-### Create First User
-
-1. Navigate to **Users** (left sidebar)
-2. Click **Create new user**
-3. Fill in:
-   - **Username:** `testuser`
-   - **Email:** `test@example.com`
-   - **First name:** `Test`
-   - **Last name:** `User`
-   - Check **Email verified** ✓
-4. Click **Create**
-
-### Set User Password
-
-1. Go to **Credentials** tab (at the top)
-2. Click **Set password**
-3. Enter a password: `Test123!`
-4. Check **Temporary: OFF** (user won't need to change on first login)
-5. Click **Set password**
-6. Confirm the dialog
-
-### Test Login
-
-Now test if login works:
-
-1. Go to http://localhost:3000/login
-2. Click **Login with Keycloak**
-3. Enter credentials:
-   - Username: `testuser`
-   - Password: `Test123!`
-4. You should be redirected to dashboard and see user info
-
----
-
-## Advanced: Custom User Attributes (for Multi-Tenancy)
-
-When you're ready for multi-tenant support, add custom attributes to users:
-
-### Add Tenant ID to User
-
-1. In **Users**, select your test user
-2. Go to **Attributes** tab
-3. Click **Add attribute**
-4. Add:
-   - **Key:** `tenant_id`
-   - **Value:** `tenant-001`
-5. Click **Save**
-
-### Map Tenant ID to JWT Token
-
-To automatically include `tenant_id` in the JWT token:
-
-1. Navigate to **Client Scopes** (left sidebar)
-2. Click **roles**
-3. Go to **Mappers** tab
-4. Click **Configure a new mapper** → **User Attribute**
-5. Fill in:
-   - **Name:** `tenant_id`
-   - **User Attribute:** `tenant_id`
-   - **Token Claim Name:** `tenant_id`
-   - **Claim JSON Type:** `String`
-6. Click **Save**
-
-Now the JWT token will automatically include the user's `tenant_id`. Your Go services can extract and use this for multi-tenant isolation.
-
----
-
-## Keycloak Realms (Optional)
-
-By default, we use the `master` realm. Optionally, create a separate realm for your application:
-
-### Create a New Realm
-
-1. Hover over realm name (top-left dropdown) → **Create realm**
-2. Enter **Realm name:** `prod-maintenance`
-3. Click **Create**
-
-### Switch Between Realms
-
-Click the realm dropdown (top-left) to see all realms and switch.
-
-**Note:** If you create a new realm, update your environment variable:
-```env
-KEYCLOAK_REALM=prod-maintenance
-```
-
----
-
-## Email Configuration (Optional)
-
-For production, configure SMTP to send password reset emails:
-
-1. Go to **Realm settings** (left sidebar)
-2. Click **Email** tab
-3. Fill in your SMTP configuration:
-   - **From:** `noreply@yourdomain.com`
-   - **Host:** Your SMTP server
-   - **Port:** 587 (usually)
-   - **Username/Password:** Your SMTP credentials
-4. Click **Test connection** to verify
-5. **Save**
-
-For local development, this is optional — just reset passwords manually in admin panel.
-
----
-
-## User Federation (Optional)
-
-Connect Keycloak to an existing user database (LDAP, Active Directory):
-
-1. Navigate to **User Federation** (left sidebar)
-2. Click **Add provider**
-3. Choose your provider (LDAP, Kerberos, etc.)
-4. Configure connection details
-5. Click **Save**
-
-This is not needed for initial setup.
-
----
-
-## Password Policy (Optional)
-
-Set security requirements for passwords:
-
-1. Go to **Authentication** (left sidebar)
-2. Click **Password Policy** tab
-3. Choose policies:
-   - Minimum length: 8
-   - Special characters required
-   - Number required
-   - etc.
-4. Click **Save**
-
-For development, use lenient policies. Tighten in production.
-
----
-
-## Troubleshooting
-
-### "Invalid client" Error
-
-**Cause:** Client ID doesn't match  
-**Fix:**
-- Make sure `KEYCLOAK_CLIENT_ID` in `.env.local` matches the client ID in Keycloak (case-sensitive)
-- Check client is enabled (toggle in client list)
-
-### "Redirect URI mismatch" Error
-
-**Cause:** Login callback URI not configured  
-**Fix:**
-- Go to client → **Login settings**
-- Add `http://localhost:3000/api/auth/callback/keycloak` to **Valid redirect URIs**
-- Save and try again
-
-### Can't Login with Test User
-
-**Cause:** User account disabled or password incorrect  
-**Fix:**
-- Go to **Users** → Select user
-- Check **Enabled** is ON
-- Reset password from **Credentials** tab
-
-### Keycloak Admin Page Blank
-
-**Cause:** Browser cache or JavaScript issue  
-**Fix:**
-- Hard refresh: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Linux/Windows)
-- Clear cookies for localhost:8080
-- Try different browser
-
-### Can't Access Admin Console
-
-**Cause:** Wrong admin password  
-**Fix:**
-- Reset via Docker:
-  ```bash
-  docker exec keycloak /opt/keycloak/bin/kcadm.sh \
-    update-user --username admin \
-    --set password=newpassword123
-  ```
-
----
+Either edit `keycloak/configure.sh` to provision them on every boot, or create
+them manually in the admin console at http://localhost:8080.
 
 ## Useful Keycloak Endpoints
 
-These endpoints are called automatically by NextAuth — no need to call manually:
+These are called automatically by NextAuth — no need to call manually:
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -273,39 +55,36 @@ These endpoints are called automatically by NextAuth — no need to call manuall
 | `/protocol/openid-connect/userinfo` | Get user info |
 | `/protocol/openid-connect/logout` | Logout |
 
-Full URLs (example):
+Realm-scoped base URL example:
 ```
-http://localhost:8080/realms/master/.well-known/openid-configuration
-http://localhost:8080/realms/master/protocol/openid-connect/auth?...
+http://localhost:8080/realms/prod-maintenance/.well-known/openid-configuration
 ```
-
----
 
 ## Production Checklist
 
 Before deploying to production:
 
-- [ ] Change admin password from `changeme`
-- [ ] Configure SMTP for emails
-- [ ] Use HTTPS (update `KEYCLOAK_URL` to use `https://`)
-- [ ] Set up user federation or SSO
-- [ ] Enable password policy
-- [ ] Configure backup/restore
-- [ ] Use production-grade Keycloak image (not `start-dev`)
-- [ ] Set up monitoring and logging
-- [ ] Configure TLS certificates
-- [ ] Store secrets securely (not in `.env` files)
+- [ ] Override `KEYCLOAK_ADMIN_PASSWORD` (default `changeme`)
+- [ ] Override `KEYCLOAK_CLIENT_SECRET` with a real, secret value
+- [ ] Configure SMTP for password-reset emails (admin UI → Realm settings → Email)
+- [ ] Use HTTPS (update `KEYCLOAK_URL` / `NEXTAUTH_URL` to `https://`)
+- [ ] Use a production-grade Keycloak run mode (not `start-dev`)
+- [ ] Configure backup/restore for the Keycloak Postgres database
+- [ ] Store secrets in a secret manager, not `.env` files
 
----
+## Troubleshooting
 
-## Next Steps
+**`configure.sh` logs an error:** check `docker compose logs keycloak`. The
+script retries the admin login for ~2 minutes before giving up. If it fails,
+Keycloak itself keeps running so the container stays up — fix the issue and
+recreate the container with `docker compose up -d --force-recreate keycloak`.
 
-1. ✅ Create client `web-frontend`
-2. ✅ Create test user `testuser`
-3. ✅ Copy client secret to `.env.local`
-4. 🔲 Test login: http://localhost:3000
-5. 🔲 Create more test users as needed
-6. 🔲 Add custom attributes for multi-tenancy
-7. 🔲 Configure email for production
+**Login fails with "Invalid client":** the secret in `web-frontend/.env.local`
+doesn't match the secret on the Keycloak client. Re-run with
+`docker compose up -d --force-recreate keycloak` after aligning both values.
 
-See [README.md](./README.md) for quick reference.
+**Need to start over from scratch:**
+```sh
+docker compose down -v   # drops the postgres volume, including the keycloak DB
+docker compose up -d
+```

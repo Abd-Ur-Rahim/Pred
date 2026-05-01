@@ -44,12 +44,23 @@ services:
       KC_HOSTNAME: localhost
       KC_HOSTNAME_PORT: 8080
       KC_PROXY: edge
+      KC_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme}
+      KC_REALM: ${KEYCLOAK_REALM:-prod-maintenance}
+      KC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-web-frontend}
+      KC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-web-frontend-secret}
+      KC_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI:-http://localhost:3000/api/auth/callback/keycloak}
+      KC_WEB_ORIGIN: ${KEYCLOAK_WEB_ORIGIN:-http://localhost:3000}
+      TEST_USER_PASSWORD: ${KEYCLOAK_TEST_USER_PASSWORD:-Test123!}
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    command: start-dev
+    entrypoint: ["/bin/bash", "/opt/keycloak-config/entrypoint.sh"]
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak-config/entrypoint.sh:ro
+      - ./keycloak/configure.sh:/opt/keycloak-config/configure.sh:ro
 
 volumes:
   postgres_data:
