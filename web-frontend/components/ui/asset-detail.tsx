@@ -11,10 +11,9 @@ interface AssetDetailProps {
 }
 
 export function AssetDetail({
-	assetId = "MOTOR-001",
+	assetId: _assetId = "MOTOR-001",
 	onBack,
 }: AssetDetailProps) {
-	const [selectedTab, setSelectedTab] = useState("telemetry");
 	const [telemetryData, setTelemetryData] = useState({
 		temperature: 84.2,
 		vibration: 4.8,

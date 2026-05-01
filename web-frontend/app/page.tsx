@@ -101,14 +101,20 @@ export default function Home() {
 					</nav>
 
 					<div className="mt-8 pt-4 border-t border-slate-700 space-y-1">
-						<div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors">
+						<button
+							type="button"
+							className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors"
+						>
 							<HelpCircle className="w-5 h-5" />
 							<span className="text-sm">Support</span>
-						</div>
-						<div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors">
+						</button>
+						<button
+							type="button"
+							className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 transition-colors"
+						>
 							<FileText className="w-5 h-5" />
 							<span className="text-sm">Logs</span>
-						</div>
+						</button>
 					</div>
 				</SidebarContent>
 			</Sidebar>
