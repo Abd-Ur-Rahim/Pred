@@ -27,6 +27,11 @@ Devices are persisted in PostgreSQL. Schema is managed by GORM via `AutoMigrate`
 | `MQTT_USERNAME`   | optional                       | MQTT username                                                               |
 | `MQTT_PASSWORD`   | optional                       | MQTT password                                                               |
 | `MQTT_CA_CERT`    | optional                       | CA certificate path for private/self-signed MQTTS broker certificates       |
+| `REDIS_ADDR`      | `localhost:6379`               | Redis address used for device public key cache and nonce replay protection  |
+| `REDIS_PASSWORD`  | empty                          | Redis password                                                              |
+| `REDIS_DB`        | `0`                            | Redis DB index                                                              |
+| `REDIS_PUBKEY_TTL`| `30m`                          | TTL for `device_pubkey:<device_id>` cache entries                           |
+| `REDIS_NONCE_TTL` | `60s`                          | TTL for `nonce:<device_id>:<nonce>` replay-protection entries               |
 
 ## Running
 
