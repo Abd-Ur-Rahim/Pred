@@ -58,8 +58,13 @@ Set up the web frontend:
 ```sh
 cd web-frontend
 npm install
+npm install next-auth
 npm run dev
 ```
+
+### Keycloak Setup
+
+For authentication setup, see [keycloak/README.md](./keycloak/README.md).
 
 ### Running tests
 
