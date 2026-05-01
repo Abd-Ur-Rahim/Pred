@@ -29,7 +29,7 @@ git clone https://github.com/PredictiveOps/Pred.git
 cd Pred
 ```
 
-Start the shared infrastructure (Postgres on host port `5433`, Kafka on `9092`, Mosquitto on `1883`). The Postgres container creates the databases listed in `POSTGRES_MULTIPLE_DATABASES` on first boot:
+Start the shared infrastructure (Postgres on host port `5433`, Kafka on `9092`, Mosquitto MQTTS on `8883`). The Postgres container creates the databases listed in `POSTGRES_MULTIPLE_DATABASES` on first boot:
 
 ```sh
 docker compose up -d
