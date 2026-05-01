@@ -1,5 +1,17 @@
 import NextAuth, { type NextAuthOptions } from "next-auth";
 
+// Extend NextAuth Session type to include accessToken
+declare module "next-auth" {
+  interface Session {
+    accessToken?: string;
+    user?: {
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+    };
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   debug: true,
   secret: process.env.NEXTAUTH_SECRET,
