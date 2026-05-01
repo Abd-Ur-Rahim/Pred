@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
-var Port, DatabaseURL, KafkaBrokers, KafkaTopic, MQTTBroker, MQTTClientID, MQTTTopic, MQTTUsername, MQTTPassword, MQTTCACert string
+var Port, DatabaseURL, KafkaBrokers, KafkaTopic, MQTTBroker, MQTTClientID, MQTTTopic, MQTTDeviceRegistrationTopic, MQTTDeviceRegistrationResponseTopic, MQTTUsername, MQTTPassword, MQTTCACert string
+var RedisAddr, RedisPassword, RedisPubKeyTTL, RedisNonceTTL string
+var RedisDB int
 
 func LoadConfig() {
 	err := godotenv.Load(".env")
@@ -23,9 +26,30 @@ func LoadConfig() {
 	MQTTBroker = os.Getenv("MQTT_BROKER")
 	MQTTClientID = os.Getenv("MQTT_CLIENT_ID")
 	MQTTTopic = os.Getenv("MQTT_TOPIC")
+	MQTTDeviceRegistrationTopic = os.Getenv("MQTT_DEVICE_REGISTRATION_TOPIC")
+	MQTTDeviceRegistrationResponseTopic = os.Getenv("MQTT_DEVICE_REGISTRATION_RESPONSE_TOPIC")
 	MQTTUsername = os.Getenv("MQTT_USERNAME")
 	MQTTPassword = os.Getenv("MQTT_PASSWORD")
 	MQTTCACert = os.Getenv("MQTT_CA_CERT")
+	RedisAddr = getEnv("REDIS_ADDR", "localhost:6379")
+	RedisPassword = os.Getenv("REDIS_PASSWORD")
+	RedisPubKeyTTL = getEnv("REDIS_PUBKEY_TTL", "30m")
+	RedisNonceTTL = getEnv("REDIS_NONCE_TTL", "60s")
+
+	redisDB, err := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	if err != nil {
+		log.Printf("invalid REDIS_DB value, using default 0: %v", err)
+		redisDB = 0
+	}
+	RedisDB = redisDB
 
 	fmt.Printf("Configuration loaded: PORT=%s\n", Port)
+}
+
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+
+	return fallback
 }
