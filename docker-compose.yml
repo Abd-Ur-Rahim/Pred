@@ -32,6 +32,27 @@ services:
     ports:
       - "9092:9092"
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    user: root
+    environment:
+      MQTT_DEVICE_USERNAME: ${MQTT_DEVICE_USERNAME:-pred-device}
+      MQTT_DEVICE_PASSWORD: ${MQTT_DEVICE_PASSWORD:-dev-device-password}
+      MQTT_INGESTION_USERNAME: ${MQTT_INGESTION_USERNAME:-pred-ingestion}
+      MQTT_INGESTION_PASSWORD: ${MQTT_INGESTION_PASSWORD:-dev-ingestion-password}
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./mosquitto:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/config/certs/ca.crt -u \"$${MQTT_INGESTION_USERNAME}\" -P \"$${MQTT_INGESTION_PASSWORD}\" -t '$$SYS/broker/version' -C 1 -W 5 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   keycloak:
     image: quay.io/keycloak/keycloak:25.0.1
     environment:
@@ -64,3 +85,5 @@ services:
 
 volumes:
   postgres_data:
+  mosquitto_data:
+  mosquitto_log:

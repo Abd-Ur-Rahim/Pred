@@ -2,6 +2,9 @@
 .env
 .env.local
 .env.*.local
+mosquitto/passwords
+mosquitto/certs/*
+!mosquitto/certs/.gitkeep
 
 # Dependencies
 node_modules/
