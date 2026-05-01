@@ -12,13 +12,13 @@ This repository contains all the code to all the services.
 
 ### Prerequisites
 
-| Tool           | Version | Install                                                                                                                                                                |
-| -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| git            | >=2.0   | [git-scm.com/downloads](https://git-scm.com/downloads)                                                                                                                 |
-| golang         | >=1.23  | [go.dev/doc/install](https://go.dev/doc/install)                                                                                                                       |
-| node           | >=20    | [nodejs.org/en/download](https://nodejs.org/en/download)                                                                                                               |
-| Docker         | >=20.10 | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                                                                      |
-| Docker Compose | >=2.0   | [docs.docker.com/compose/install](https://docs.docker.com/compose/install/). Or Docker Desktop. Or if you are on macOS, you can use [OrbStack](https://orbstack.dev/). |
+| Tool           | Version | Install                                                                                                                                        |
+| -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| git            | >=2.0   | [git-scm.com/downloads](https://git-scm.com/downloads)                                                                                         |
+| golang         | >=1.23  | [go.dev/doc/install](https://go.dev/doc/install)                                                                                               |
+| node           | >=20    | [nodejs.org/en/download](https://nodejs.org/en/download)                                                                                       |
+| Docker         | >=20.10 | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                                              |
+| Docker Compose | >=2.0   | [docs.docker.com/compose/install](https://docs.docker.com/compose/install/). Or Docker Desktop. Or [OrbStack](https://orbstack.dev/) on macOS. |
 
 ### Installation
 
@@ -57,8 +57,8 @@ Set up the web frontend:
 
 ```sh
 cd web-frontend
+cp .env.example .env
 npm install
-npm install next-auth
 npm run dev
 ```
 
