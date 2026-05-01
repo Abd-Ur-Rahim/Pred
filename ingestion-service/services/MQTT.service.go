@@ -44,23 +44,33 @@ func CreateMQTTClient(broker, clientID, username, password, caCertPath string) (
 func createTLSConfig(caCertPath string) (*tls.Config, error) {
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
-		certPool = x509.NewCertPool()
+		// Keep RootCAs nil when no custom CA is provided, so Go can use host roots.
+		if caCertPath != "" {
+			certPool = x509.NewCertPool()
+		} else {
+			certPool = nil
+		}
 	}
 
 	if caCertPath != "" {
+		if certPool == nil {
+			certPool = x509.NewCertPool()
+		}
 		caCert, err := os.ReadFile(caCertPath)
 		if err != nil {
 			return nil, fmt.Errorf("read MQTT CA certificate: %w", err)
 		}
 		if ok := certPool.AppendCertsFromPEM(caCert); !ok {
-			return nil, errors.New("append MQTT CA certificate")
+			return nil, errors.New("failed to append MQTT CA certificate (invalid PEM)")
 		}
 	}
 
-	return &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		RootCAs:    certPool,
-	}, nil
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+	if certPool != nil {
+		tlsConfig.RootCAs = certPool
+	}
+
+	return tlsConfig, nil
 }
 
 func ConnectMQTTClient(client mqtt.Client) error {
