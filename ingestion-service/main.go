@@ -9,23 +9,25 @@ import (
 	"ingestion-service/router"
 	"ingestion-service/services"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 func main() {
 	config.LoadConfig()
 
-	if config.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+	if err := config.Validate(); err != nil {
+		log.Fatalf("configuration invalid: %v", err)
 	}
 
 	gdb, err := db.Open(context.Background(), config.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
-	}
-
-	if gdb == nil {
-		log.Fatal("Database connection not established")
 	}
 
 	// Migrate the schema
@@ -35,11 +37,6 @@ func main() {
 
 	kafkaProducer := services.NewKafkaProducer(config.KafkaBrokers, config.KafkaTopic)
 	handlers.SetKafkaProducer(kafkaProducer)
-	defer func() {
-		if err := kafkaProducer.Close(); err != nil {
-			log.Printf("Failed to close Kafka producer: %v", err)
-		}
-	}()
 
 	pubKeyTTL, err := time.ParseDuration(config.RedisPubKeyTTL)
 	if err != nil {
@@ -61,11 +58,6 @@ func main() {
 		log.Fatalf("Failed to initialize Redis cache: %v", err)
 	}
 	handlers.SetRedisCache(redisCache)
-	defer func() {
-		if err := redisCache.Close(); err != nil {
-			log.Printf("Failed to close Redis cache: %v", err)
-		}
-	}()
 
 	mqttClient, err := services.CreateMQTTClient(
 		config.MQTTBroker,
@@ -83,11 +75,75 @@ func main() {
 	}
 
 	handlers.SetRegistrationResponseTopicTemplate(config.MQTTDeviceRegistrationResponseTopic)
-	if err := services.SubscribeMQTTTopic(mqttClient, "devices/+/+", handlers.HandleMQTTMessage); err != nil {
-		log.Fatalf("MQTT subscribe failed: %v", err)
-	}
-	defer services.DisconnectMQTTClient(mqttClient)
 
+	// Subscribe to configured data topic
+	if config.MQTTTopic != "" {
+		if err := services.SubscribeMQTTTopic(mqttClient, config.MQTTTopic, handlers.HandleMQTTMessage); err != nil {
+			log.Fatalf("MQTT subscribe to data topic failed: %v", err)
+		}
+	} else {
+		log.Printf("MQTT data topic not configured; skipping subscription")
+	}
+
+	// Subscribe to registration topic with a wrapper that supplies the response template
+	if config.MQTTDeviceRegistrationTopic != "" {
+		regHandler := func(c mqtt.Client, m mqtt.Message) {
+			handlers.HandleMQTTDeviceRegistrationWithTemplate(c, m, config.MQTTDeviceRegistrationResponseTopic)
+		}
+		if err := services.SubscribeMQTTTopic(mqttClient, config.MQTTDeviceRegistrationTopic, regHandler); err != nil {
+			log.Fatalf("MQTT subscribe to registration topic failed: %v", err)
+		}
+	} else {
+		log.Printf("MQTT registration topic not configured; skipping subscription")
+	}
+
+	// Start HTTP server and handle graceful shutdown
 	r := router.NewRouter(gdb)
-	log.Fatal(r.Run(fmt.Sprintf(":%s", config.Port)))
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", config.Port),
+		Handler: r,
+	}
+
+	// start server
+	go func() {
+		log.Printf("HTTP server listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
+	}()
+
+	// wait for termination signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Printf("shutdown signal received, stopping service")
+
+	// give components up to 10s to shut down
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown HTTP server
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+	}
+
+	// Disconnect MQTT
+	services.DisconnectMQTTClient(mqttClient)
+
+	// Close Kafka producer
+	if err := kafkaProducer.Close(); err != nil {
+		log.Printf("Failed to close Kafka producer: %v", err)
+	}
+
+	// Close Redis
+	if err := redisCache.Close(); err != nil {
+		log.Printf("Failed to close Redis cache: %v", err)
+	}
+
+	// Close DB connection
+	if sqlDB, err := gdb.DB(); err == nil {
+		sqlDB.Close()
+	}
+
+	log.Printf("service stopped")
 }

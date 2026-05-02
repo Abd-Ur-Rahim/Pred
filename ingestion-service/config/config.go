@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -14,12 +15,15 @@ var RedisAddr, RedisPassword, RedisPubKeyTTL, RedisNonceTTL string
 var RedisDB int
 
 func LoadConfig() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// Load .env if present; do not fail when it's missing (allow env-based configs)
+	if err := godotenv.Load(".env"); err != nil {
+		log.Printf(".env file not loaded (proceeding to env vars): %v", err)
 	}
 
 	Port = os.Getenv("PORT")
+	if Port == "" {
+		Port = "8080"
+	}
 	DatabaseURL = os.Getenv("DATABASE_URL")
 	KafkaBrokers = os.Getenv("KAFKA_BROKERS")
 	KafkaTopic = os.Getenv("KAFKA_TOPIC")
@@ -44,6 +48,38 @@ func LoadConfig() {
 	RedisDB = redisDB
 
 	fmt.Printf("Configuration loaded: PORT=%s\n", Port)
+}
+
+// Validate returns an error describing missing required configuration values.
+func Validate() error {
+	missing := []string{}
+	if DatabaseURL == "" {
+		missing = append(missing, "DATABASE_URL")
+	}
+	if KafkaBrokers == "" {
+		missing = append(missing, "KAFKA_BROKERS")
+	}
+	if KafkaTopic == "" {
+		missing = append(missing, "KAFKA_TOPIC")
+	}
+	if MQTTClientID == "" {
+		missing = append(missing, "MQTT_CLIENT_ID")
+	}
+	if MQTTTopic == "" {
+		missing = append(missing, "MQTT_TOPIC")
+	}
+	if MQTTDeviceRegistrationTopic == "" {
+		missing = append(missing, "MQTT_DEVICE_REGISTRATION_TOPIC")
+	}
+	if MQTTDeviceRegistrationResponseTopic == "" {
+		missing = append(missing, "MQTT_DEVICE_REGISTRATION_RESPONSE_TOPIC")
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("missing required configuration: %s", strings.Join(missing, ", "))
 }
 
 func getEnv(key, fallback string) string {
