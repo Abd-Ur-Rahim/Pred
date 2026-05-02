@@ -59,6 +59,21 @@ func main() {
 	}
 	handlers.SetRedisCache(redisCache)
 
+	// Start HTTP server as early as possible so health checks can succeed even
+	// while MQTT initialization is still connecting or retrying.
+	r := router.NewRouter(gdb)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", config.Port),
+		Handler: r,
+	}
+
+	go func() {
+		log.Printf("HTTP server listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
+	}()
+
 	mqttClient, err := services.CreateMQTTClient(
 		config.MQTTBroker,
 		config.MQTTClientID,
@@ -96,21 +111,6 @@ func main() {
 	} else {
 		log.Printf("MQTT registration topic not configured; skipping subscription")
 	}
-
-	// Start HTTP server and handle graceful shutdown
-	r := router.NewRouter(gdb)
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", config.Port),
-		Handler: r,
-	}
-
-	// start server
-	go func() {
-		log.Printf("HTTP server listening on %s", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server ListenAndServe: %v", err)
-		}
-	}()
 
 	// wait for termination signal
 	quit := make(chan os.Signal, 1)
