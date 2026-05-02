@@ -1,0 +1,115 @@
+_format_version: "3.0"
+
+upstreams:
+  - name: event-processing-upstream
+    targets:
+      - target: event-processing-service:8001
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 1
+        concurrency: 10
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          tcp_failures: 2
+          http_failures: 2
+          timeouts: 2
+
+  - name: ingestion-upstream
+    targets:
+      - target: ingestion-service:8003
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 1
+        concurrency: 10
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          tcp_failures: 2
+          http_failures: 2
+          timeouts: 2
+
+services:
+  - name: event-processing
+    host: event-processing-upstream
+    path: /
+    routes:
+      - name: events-route
+        paths:
+          - /api/events
+        strip_path: true
+
+  - name: ingestion
+    host: ingestion-upstream
+    path: /
+    routes:
+      - name: ingestion-route
+        paths:
+          - /api/ingest
+        strip_path: true
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - Authorization
+      exposed_headers:
+        - Authorization
+      credentials: true
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 60
+      policy: local
+
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10
+
+  - name: jwt
+    config:
+      claims_to_verify:
+        - exp
+
+consumers:
+  - username: keycloak-consumer
+
+jwt_secrets:
+  - consumer: keycloak-consumer
+    key: "http://localhost:8080/realms/prod-maintenance"
+    algorithm: RS256
+    rsa_public_key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsSI7Mvr09mLz15e1u2gu
+      0g0qobGkyz3cFjCLfXlCHk+62gdyP9zLwLAwlPaUIZ6ZGtqknmO8XVt0ARAT6An2
+      UUr5rFDNUwc3nhhEg84xvOKEJ1Gzl0iVE2mHySd+ZZr/VpOT0HbuDfsBl5MqueoZ
+      qJ68wLKHfw3SXtMe+CSbfTjJu5MQYiA/pophjsAON/4PGjdTxTGXtpbMo/UJrlOX
+      /062CsTgK7aOg6uM1Bi8B/MQU6KQB2PhiINPwN9jBYCOYnnHTaW51iroGj4JTndu
+      OGelQmkSOMct8grjVEqhT/M8NhVS82ctm1Wk7L9S+f9JNDPhs0HaIIcD4KCO9jRa
+      fwIDAQAB
+      -----END PUBLIC KEY-----
