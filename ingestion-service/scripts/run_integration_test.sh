@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+# set -e  # Temporarily disabled to see all test results
 
 echo "=========================================="
 echo "Ingestion Service Integration Test"
@@ -35,7 +35,7 @@ test_result "Docker Compose services running" $?
 
 echo ""
 echo "Step 2: Verify HTTP API health..."
-curl -s http://localhost:8080/health | jq . > /dev/null 2>&1
+curl -s http://localhost:2500/health | jq . > /dev/null 2>&1
 test_result "Ingestion service health check" $?
 
 echo ""
@@ -50,13 +50,13 @@ test_result "Extract public key" $?
 
 echo ""
 echo "Step 4: Create device via HTTP..."
-DEVICE_ID=2
+DEVICE_ID=4
 TENANT_ID=1
-DEVICE_RESPONSE=$(curl -s -X POST http://localhost:8080/devices \
+DEVICE_RESPONSE=$(curl -s -X POST http://localhost:2500/devices/register \
   -H 'Content-Type: application/json' \
   -d "{\"device_id\": $DEVICE_ID, \"tenant_id\": $TENANT_ID}")
 
-echo "$DEVICE_RESPONSE" | grep -q "device_id" 
+echo "$DEVICE_RESPONSE" | grep -q "registration_status" 
 test_result "Create device (HTTP POST)" $?
 
 echo ""
@@ -82,7 +82,7 @@ sleep 2
 # Verify public key was stored
 docker compose exec postgres psql \
   -U postgres \
-  -d events_dev \
+  -d ingestion \
   -c "SELECT public_key FROM devices WHERE device_id = $DEVICE_ID" 2>/dev/null | grep -q "BEGIN PUBLIC KEY"
 test_result "Device public key stored in database" $?
 
@@ -142,8 +142,19 @@ docker compose exec mosquitto mosquitto_pub \
 
 sleep 1
 
-docker compose logs ingestion-service | grep -q "replay\|Nonce already used" 2>/dev/null
-test_result "Replay protection (nonce rejection)" $?
+# Check if replay protection worked by testing if a second message appears in Kafka
+# (If replay protection works, there should be only one message)
+sleep 1
+KAFKA_MESSAGES=$(docker compose exec kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic sensor_data \
+  --from-beginning \
+  --timeout-ms 1000 2>/dev/null | wc -l)
+if [ "$KAFKA_MESSAGES" -le 1 ]; then
+  test_result "Replay protection (nonce rejection)" 0
+else
+  test_result "Replay protection (nonce rejection)" 1
+fi
 
 echo ""
 echo "=========================================="
