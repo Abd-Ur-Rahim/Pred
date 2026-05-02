@@ -1,22 +1,25 @@
 package db
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Device struct {
-	DeviceID  uint    `gorm:"primaryKey" json:"device_id"`
-	TenantID  uint    `json:"tenant_id"`
-	PublicKey *string `json:"public_key"`
-	IsActive  bool    `json:"is_active" gorm:"default:false"`
-	CreatedAt *int64  `json:"created_at"`
-	UpdatedAt *int64  `json:"updated_at" gorm:"autoUpdateTime"`
+	DeviceID  uint      `gorm:"primaryKey" json:"device_id"`
+	TenantID  uint      `json:"tenant_id"`
+	PublicKey *string   `json:"public_key"`
+	IsActive  bool      `json:"is_active" gorm:"default:false"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 type DeviceDetails struct {
-	DeviceID  uint   `json:"device_id"`
-	TenantID  uint   `json:"tenant_id"`
-	IsActive  bool   `json:"is_active"`
-	CreatedAt *int64 `json:"created_at"`
-	UpdatedAt *int64 `json:"updated_at"`
+	DeviceID  uint      `json:"device_id"`
+	TenantID  uint      `json:"tenant_id"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type DeviceHTTPRegistrationRequest struct {
@@ -43,10 +46,10 @@ type SensorDeviceData struct {
 }
 
 type MQTTPayload struct {
-	Timestamp int64            `json:"timestamp"`
-	Nonce     string           `json:"nonce"`
-	Data      json.RawMessage  `json:"data"`
-	Signature string           `json:"signature"`
+	Timestamp int64           `json:"timestamp"`
+	Nonce     string          `json:"nonce"`
+	Data      json.RawMessage `json:"data"`
+	Signature string          `json:"signature"`
 }
 
 type KafkaPayload struct {
