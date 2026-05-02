@@ -49,6 +49,11 @@ def main() -> None:
         asset_id="bearing_motor_001",
     )
 
+    # Basic verification that the new decision layer fields are present
+    assert "severity_level" in prediction
+    assert "is_anomaly" in prediction
+    assert "recommended_action" in prediction
+
     print(json.dumps(prediction, indent=2))
 
 

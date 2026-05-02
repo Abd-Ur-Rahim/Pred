@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -35,6 +35,9 @@ class PredictResponse(BaseModel):
     model_version: str
     anomaly_score: float
     predicted_status: str
+    severity_level: int
+    is_anomaly: Optional[bool]
+    recommended_action: str
     timestamp: str
 
 
