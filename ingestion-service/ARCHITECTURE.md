@@ -3,24 +3,25 @@
 This document describes the architecture of the `ingestion-service` (device-facing entrypoint), its responsibilities, inputs/outputs, deployment surfaces, and integration considerations. It is scoped to the ingestion microservice only.
 
 ## Purpose and responsibilities
-- Accept telemetry from devices via MQTT and HTTP.
-- Normalize and validate telemetry payloads.
-- Enrich messages with metadata (tenant_id, received_at, provenance).
-- Publish normalized events to Kafka (`events` topic) for downstream services to consume.
+- Accept signed telemetry from devices via MQTT.
+- Verify message authenticity using each device's registered public key.
+- Protect against replay attacks by validating the per-message nonce.
+- Validate and forward verified device data to Kafka for downstream consumers.
 
 ## Component overview
-- MQTT broker client: subscribes/accepts device topics (e.g., `devices/{tenant_id}/{device_id}/telemetry`) and translates MQTT payloads to normalized events.
-- HTTP ingest endpoint: lightweight REST endpoint for devices/gateways to POST telemetry.
-- Normalizer & validator: enforces schema (required fields, timestamps, types) and drops or NACKs invalid payloads.
-- Kafka producer: publishes canonical event JSON to the configured `KAFKA_TOPIC_EVENTS`.
-- Health + metrics endpoint: exposes `/health` and `/metrics` for orchestration and monitoring.
+- MQTT broker client: subscribes/accepts device topics at `devices/{deviceID}/data` and receives signed telemetry envelopes.
+- Signature verification layer: extracts the raw `data` bytes, hashes them with SHA256, and verifies the ECDSA signature using the device's registered public key.
+- Replay-protection store: tracks previously used nonces per device to reject replayed messages.
+- Payload validator: validates the verified payload shape and rejects malformed device data.
+- Kafka producer: publishes verified device data for downstream processing.
+- Health + metrics surface: exposes operational status and monitoring signals for orchestration and observability.
 
 ## Logical flow
-1. Device publishes telemetry via MQTT or POSTs JSON to HTTP API.
-2. Ingest receives raw payload and extracts `tenant_id` (required). If missing, reject with HTTP 400 or drop + log for MQTT clients.
-3. Normalizer validates fields and adds `received_at` in UTC and a unique `message_id` if absent.
-4. Producer publishes canonical event to Kafka (`events` topic) with key set to `tenant_id` or `device_id` (partitioning strategy).
-5. Service returns success ack to device/gateway (HTTP 200 / MQTT PUBACK).
+1. Device publishes a signed telemetry envelope to the MQTT topic `devices/{deviceID}/data`.
+2. Ingestion receives the raw payload and extracts `timestamp`, `nonce`, `data`, and `signature`.
+3. The service verifies the ECDSA signature over the exact raw bytes of `data` using the device's registered public key.
+4. The service checks the `nonce` to prevent replay attacks and validates the decoded `data` payload.
+5. If all checks pass, the verified device data is forwarded to Kafka and the MQTT publish is acknowledged; otherwise the message is rejected and logged.
 
 ## MQTT Device Data Payload (device → ingestion)
 
