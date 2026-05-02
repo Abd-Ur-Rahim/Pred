@@ -17,7 +17,7 @@ Devices are persisted in PostgreSQL. Schema is managed by GORM via `AutoMigrate`
 
 | Variable          | Default                        | Description                                                                 |
 | ----------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| `PORT`            | `8080`                         | Port the HTTP API listens on                                                |
+| `PORT`            | `2500`                         | Port the HTTP API listens on                                                |
 | `DATABASE_URL`    | required                       | PostgreSQL connection string                                                |
 | `KAFKA_BROKERS`   | `localhost:9092`               | Comma-separated list of Kafka bootstrap brokers                             |
 | `KAFKA_TOPIC`     | required                       | Kafka topic used for published device events                                |
@@ -27,6 +27,8 @@ Devices are persisted in PostgreSQL. Schema is managed by GORM via `AutoMigrate`
 | `MQTT_USERNAME`   | optional                       | MQTT username                                                               |
 | `MQTT_PASSWORD`   | optional                       | MQTT password                                                               |
 | `MQTT_CA_CERT`    | optional                       | CA certificate path for private/self-signed MQTTS broker certificates       |
+| `MQTT_DEVICE_REGISTRATION_TOPIC` | required | MQTT topic for device public key registration (e.g., `devices/+/registration`) |
+| `MQTT_DEVICE_REGISTRATION_RESPONSE_TOPIC` | required | Template for MQTT registration response topic (e.g., `devices/%d/registration/response`) |
 | `REDIS_ADDR`      | `localhost:6379`               | Redis address used for device public key cache and nonce replay protection  |
 | `REDIS_PASSWORD`  | empty                          | Redis password                                                              |
 | `REDIS_DB`        | `0`                            | Redis DB index                                                              |
@@ -50,7 +52,7 @@ Register a device (creates DB entry). Endpoint:
 Example:
 
 ```sh
-curl -s -X POST http://localhost:8080/devices/register \
+curl -s -X POST http://localhost:2500/devices/register \
 	-H 'Content-Type: application/json' \
 	-d '{"device_id":1,"tenant_id":1}' | jq .
 ```

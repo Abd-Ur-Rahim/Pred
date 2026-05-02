@@ -74,7 +74,7 @@ Before a device can send telemetry:
 
 1. **HTTP: Create shell device record**
    ```bash
-   curl -X POST http://localhost:8080/devices \
+   curl -X POST http://localhost:2500/devices/register \
      -H 'Content-Type: application/json' \
      -d '{"device_id": 1, "tenant_id": 1}'
    ```

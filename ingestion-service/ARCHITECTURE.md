@@ -83,7 +83,7 @@ The ingestion service publishes the sensor data to Kafka with device metadata:
 - `KAFKA_TOPIC_EVENTS` — default `events`
 - `KAFKA_GROUP_ID` — used when ingestion contains any consumer parts (optional)
 - `MQTT_BROKER_URL` — URL for MQTT broker (e.g., `tcp://mosquitto:1883`)
-- `HTTP_BIND_ADDR` — HTTP listen address (e.g., `:8080`)
+- `HTTP_BIND_ADDR` — HTTP listen address (e.g., `:2500`)
 - `LOG_LEVEL` — logging verbosity
 - `DATABASE_URL` — only if the ingestion service needs a local DB for dedupe/offsets (not required in current implementation)
 
@@ -107,15 +107,30 @@ The ingestion service publishes the sensor data to Kafka with device metadata:
 - Quick test commands (examples):
 
 ```sh
-# publish MQTT test message
-mosquitto_pub -h localhost -p 1883 -t "devices/tenant-123/device-001/telemetry" -m '{"device_id":"device-001","tenant_id":"tenant-123","timestamp":"2026-05-02T15:04:05Z","metrics":{"temperature_c":72.5}}'
+# Generate test keypair
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out /tmp/device-private.pem
+openssl pkey -in /tmp/device-private.pem -pubout -out /tmp/device-public.pem
 
-# POST to HTTP ingest
-curl -X POST http://localhost:8080/ingest -H 'Content-Type: application/json' -d '{"tenant_id":"tenant-123","device_id":"device-001","timestamp":"2026-05-02T15:04:05Z","metrics":{"temperature_c":72.5}}'
+# Register device
+curl -X POST http://localhost:2500/devices/register \
+  -H 'Content-Type: application/json' \
+  -d '{"device_id": 1, "tenant_id": 1}'
+
+# Generate signed telemetry payload
+python3 scripts/sign_mqtt_payload.py /tmp/device-private.pem > /tmp/signed-payload.json
+
+# Publish signed telemetry via MQTT
+docker compose exec mosquitto mosquitto_pub \
+  -h localhost -p 8883 \
+  --cafile /mosquitto/config/certs/ca.crt \
+  -u pred-device -P dev-device-password \
+  -i 1 \
+  -t 'devices/1/data' \
+  -f /tmp/signed-payload.json
 ```
 
 ## Integrations (downstream)
-- `event-processing-service` consumes `events` topic — coordinate the `KAFKA_TOPIC_EVENTS` name and partitioning key.
+- `event-processing-service` consumes `sensor_data` topic — coordinate the `KAFKA_TOPIC` name and partitioning key.
 - Alerting/notification flows depend on downstream processors; ingestion should not emit alerts directly.
 
 ---

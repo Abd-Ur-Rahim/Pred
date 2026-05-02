@@ -31,7 +31,7 @@ docker compose ps
 # - kafka (running on port 9092)
 # - mosquitto (running on port 8883 with TLS)
 # - redis (running on port 6379)
-# - ingestion-service (running on port 8080)
+# - ingestion-service (running on port 2500)
 ```
 
 **Expected Output:**
@@ -57,7 +57,7 @@ docker compose ps
 
 ```bash
 # Health check endpoint
-curl -s http://localhost:8080/health | jq .
+curl -s http://localhost:2500/health | jq .
 
 # Expected output:
 # { "status": "ok" }
@@ -69,7 +69,7 @@ curl -s http://localhost:8080/health | jq .
 cd ingestion-service
 cp .env.example .env
 # Edit .env to set DATABASE_URL, KAFKA_BROKERS, MQTT_BROKER, etc.
-go run .  # runs on :8080
+go run .  # runs on :2500
 ```
 
 ### 1.3: Verify Mosquitto TLS Certificates Exist
@@ -147,7 +147,7 @@ See [scripts/sign_mqtt_payload.py](scripts/sign_mqtt_payload.py) for implementat
 
 ```bash
 # Create a new device associated with tenant_id=1
-DEVICE_RESPONSE=$(curl -s -X POST http://localhost:8080/devices/register \
+DEVICE_RESPONSE=$(curl -s -X POST http://localhost:2500/devices/register \
   -H 'Content-Type: application/json' \
   -d '{
     "device_id": 1,
@@ -159,12 +159,7 @@ echo "$DEVICE_RESPONSE" | jq .
 
 # Expected output:
 # {
-#   "id": 1,
-#   "device_id": 1,
-#   "tenant_id": 1,
-#   "public_key": null,
-#   "is_active": true,
-#   "created_at": "2026-05-02T15:04:05Z"
+#   "registration_status": "ok"
 # }
 ```
 
@@ -181,13 +176,10 @@ docker compose exec postgres psql \
   -d ingestion \
   -c "SELECT device_id, tenant_id, public_key, is_active FROM devices LIMIT 5;"
 
-# Expected: device_id=1, tenant_id=1, public_key=NULL, is_active=true
+# Expected: device_id=1, tenant_id=1, public_key=NULL, is_active=false
 
-#update isActive to true for testing
-docker compose exec postgres psql \
-  -U postgres \
-  -d ingestion \
-  -c "UPDATE devices SET is_active = true WHERE device_id = 1;"
+# Note: Devices are created inactive and become active only after
+# successful MQTT public key registration
 ```
 
 ### 3.3: Register Device Public Key Via MQTT
@@ -535,7 +527,7 @@ docker compose ps
 docker compose restart ingestion-service
 
 # Verify health
-curl -s http://localhost:8080/health | jq .
+curl -s http://localhost:2500/health | jq .
 ```
 
 ### 9.3: Clean Redis Cache

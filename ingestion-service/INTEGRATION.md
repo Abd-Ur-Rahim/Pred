@@ -19,101 +19,110 @@ go run .
 3. Confirm service health:
 
 ```sh
-curl http://localhost:8080/health
+curl http://localhost:2500/health
 ```
 
-## Required environment variables (minimum)
-- `KAFKA_BROKERS` (e.g. `localhost:9092`)
-- `KAFKA_TOPIC_EVENTS` (default: `events`)
-- `MQTT_BROKER_URL` (if using MQTT integration, e.g. `tcp://localhost:1883`)
-- `HTTP_BIND_ADDR` (e.g. `:8080`)
-- `LOG_LEVEL`
 
-Place these in `ingestion-service/.env` or export them before running.
+## MQTT Device Registration Flow
 
-## Supported ingestion methods
-- MQTT: devices publish to topics structured as `devices/{tenant_id}/{device_id}/telemetry`.
-- HTTP: POST JSON to `/ingest` (or configured path). The request must contain `tenant_id` and `device_id`.
+Before devices can send telemetry, they must be registered:
 
-## Canonical ingestion payload (device -> ingestion)
-Device-sent example (raw) — minimal required fields:
-
-```json
-{
-  "tenant_id": "tenant-123",
-  "device_id": "device-001",
-  "timestamp": "2026-05-02T15:04:00Z",
-  "metrics": {"temperature_c": 72.5}
-}
-```
-
-The ingestion service will validate and transform it into the canonical Kafka event (see next section).
-
-## Canonical Kafka event (ingestion -> Kafka `events`)
-Always include `tenant_id` and a stable `message_id` for dedupe:
-
-```json
-{
-  "message_id": "uuid-...",
-  "tenant_id": "tenant-123",
-  "device_id": "device-001",
-  "received_at": "2026-05-02T15:04:05Z",
-  "timestamp": "2026-05-02T15:04:00Z",
-  "metrics": {"temperature_c": 72.5},
-  "meta": {"source":"http","firmware_version":"1.2.3"}
-}
-```
-
-Producer note: set the Kafka message key to `tenant_id` (or `device_id` if per-device ordering is required).
-
-## Test commands (examples)
-
-- Publish via MQTT (using `mosquitto_pub`):
-
+1. **Create device record via HTTP**:
 ```sh
-mosquitto_pub -h localhost -p 1883 -t "devices/tenant-123/device-001/telemetry" -m '{"tenant_id":"tenant-123","device_id":"device-001","timestamp":"2026-05-02T15:04:00Z","metrics":{"temperature_c":72.5}}'
-```
-
-- POST via HTTP:
-
-```sh
-curl -X POST http://localhost:8080/ingest \
+curl -X POST http://localhost:2500/devices/register \
   -H 'Content-Type: application/json' \
-  -d '{"tenant_id":"tenant-123","device_id":"device-001","timestamp":"2026-05-02T15:04:00Z","metrics":{"temperature_c":72.5}}'
+  -d '{"device_id": 1, "tenant_id": 1}'
 ```
 
-- Produce directly to Kafka (for downstream e2e tests):
-
+2. **Register public key via MQTT**:
 ```sh
-kafka-console-producer --broker-list localhost:9092 --topic events
-{"message_id":"test-1","tenant_id":"tenant-123","device_id":"device-001","received_at":"2026-05-02T15:04:05Z","timestamp":"2026-05-02T15:04:00Z","metrics":{"temperature_c":72.5}}
+# Read public key and publish to registration topic
+PUBLIC_KEY=$(cat /tmp/test-device-public.pem)
+docker compose exec mosquitto mosquitto_pub \
+  -h localhost -p 8883 \
+  --cafile /mosquitto/config/certs/ca.crt \
+  -u pred-device -P dev-device-password \
+  -i 1 \
+  -t 'devices/1/registration' \
+  -m "$(jq -nc --arg pk "$PUBLIC_KEY" '{public_key:$pk}')"
 ```
 
-## Validation and verification
-- After sending a message, consume the `events` topic to verify the canonical event appears:
+## Signed MQTT Telemetry Payload
 
+Devices send cryptographically signed telemetry to `devices/{deviceID}/data`:
+
+```json
+{
+  "timestamp": 1704067200,
+  "nonce": "n-1234567890",
+  "data": {
+    "mode": "normal",
+    "v_rms": 1.23,
+    "temp_c": 72.4,
+    "peak_hz_1": 50,
+    "peak_hz_2": 100,
+    "peak_hz_3": 150,
+    "status": "ok"
+  },
+  "signature": "BASE64_ENCODED_ECDSA_SIGNATURE"
+}
+```
+
+### Field Requirements
+- `timestamp`: Unix timestamp (seconds)
+- `nonce`: Unique per message (replay protection)
+- `data`: Sensor readings object
+- `signature`: ECDSA signature over exact bytes of `data`
+
+## Test Commands
+
+### Generate Test Keypair
 ```sh
-kafka-console-consumer --bootstrap-server localhost:9092 --topic events --from-beginning
+# Private key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out /tmp/device-private.pem
+
+# Public key  
+openssl pkey -in /tmp/device-private.pem -pubout -out /tmp/test-device-public.pem
 ```
 
-- Check `ingestion-service` logs for structured entries with `message_id` and `tenant_id`.
+### Sign and Publish Telemetry
+```sh
+# Generate signed payload
+python3 scripts/sign_mqtt_payload.py /tmp/device-private.pem > /tmp/signed_payload.json
 
-## Integration considerations (concise)
-- Tenant propagation: `tenant_id` is mandatory and must match downstream tenant mapping.
-- Idempotency: generate or forward `message_id` to allow downstream dedup.
-- Ordering: if needed, partition by `device_id`.
-- Error handling: invalid payloads should be rejected with a clear error for HTTP or logged and sent to a dead-letter topic for MQTT.
+# Publish via MQTT
+docker compose exec mosquitto mosquitto_pub \
+  -h localhost -p 8883 \
+  --cafile /mosquitto/config/certs/ca.crt \
+  -u pred-device -P dev-device-password \
+  -i 1 \
+  -t 'devices/1/data' \
+  -f /tmp/signed_payload.json
+```
 
-## Security notes
-- For production, require TLS for HTTP and MQTT and authenticate devices (tokens or client certs).
-- Secure Kafka with TLS and SASL; do not expose brokers directly to the public internet.
+### Verify Kafka Output
+```sh
+docker compose exec kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic sensor_data \
+  --from-beginning \
+  --max-messages 1
+```
+
+## Integration Notes
+
+- **Kafka Topic**: `sensor_data` (not `events`)
+- **Message Flow**: Device → MQTT (signed) → Verification → Kafka
+- **No HTTP Ingestion**: Service only accepts telemetry via MQTT
+- **Signature Verification**: All telemetry must be cryptographically signed
+- **Replay Protection**: Nonces are tracked to prevent replay attacks
+## Security Notes
+- For production, require TLS for MQTT and authenticate devices with client certificates
+- Secure Kafka with TLS and SASL; do not expose brokers directly to the public internet
 
 ## Troubleshooting
-- If messages are not appearing on `events`, check:
-  - `ingestion-service` logs for publish errors.
-  - Kafka broker connectivity (`KAFKA_BROKERS`).
-  - Topic name (`KAFKA_TOPIC_EVENTS`) mismatch.
-
----
-If you'd like, I can add a small sample test harness that publishes MQTT and HTTP messages and verifies Kafka consumption. Would you like that? 
-## Database names used in tests / dev
+- If messages are not appearing on `sensor_data`, check:
+  - Device is registered and has a valid public key
+  - MQTT TLS certificates are configured correctly
+  - Signature verification is working (check device private/public key pair)
+  - Redis is running for nonce replay protection
