@@ -68,7 +68,6 @@ func handleMQTTDataMessage(deviceID uint, msg mqtt.Message) {
 		return
 	}
 
-
 	deviceKey := strconv.FormatUint(uint64(deviceID), 10)
 	kafkaPayload := prepareKafkaPayload(deviceID, message.Timestamp, sensorData)
 	kafkaJSON, err := json.Marshal(kafkaPayload)

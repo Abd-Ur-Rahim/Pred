@@ -61,18 +61,24 @@ func (r *realRedisClient) Close() error { return r.c.Close() }
 func (r *realRedisClient) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	return r.c.Set(ctx, key, value, ttl).Err()
 }
-func (r *realRedisClient) Get(ctx context.Context, key string) (string, error) { return r.c.Get(ctx, key).Result() }
+func (r *realRedisClient) Get(ctx context.Context, key string) (string, error) {
+	return r.c.Get(ctx, key).Result()
+}
 func (r *realRedisClient) HSet(ctx context.Context, key string, values map[string]interface{}) error {
 	return r.c.HSet(ctx, key, values).Err()
 }
-func (r *realRedisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) { return r.c.HGetAll(ctx, key).Result() }
+func (r *realRedisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	return r.c.HGetAll(ctx, key).Result()
+}
 func (r *realRedisClient) Expire(ctx context.Context, key string, expiration time.Duration) (bool, error) {
 	return r.c.Expire(ctx, key, expiration).Result()
 }
 func (r *realRedisClient) SetNX(ctx context.Context, key string, value interface{}, ttl time.Duration) (bool, error) {
 	return r.c.SetNX(ctx, key, value, ttl).Result()
 }
-func (r *realRedisClient) Exists(ctx context.Context, keys ...string) (int64, error) { return r.c.Exists(ctx, keys...).Result() }
+func (r *realRedisClient) Exists(ctx context.Context, keys ...string) (int64, error) {
+	return r.c.Exists(ctx, keys...).Result()
+}
 
 func (r *RedisCache) Close() error {
 	return r.client.Close()

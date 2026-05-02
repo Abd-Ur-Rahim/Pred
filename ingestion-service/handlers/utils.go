@@ -51,12 +51,20 @@ func verifySignature(pub *ecdsa.PublicKey, payload []byte, sig []byte) bool { //
 
 func ParsePublicKey(pemStr string) (*ecdsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(pemStr))
+	if block == nil {
+		return nil, fmt.Errorf("invalid PEM public key")
+	}
+
 	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	return pub.(*ecdsa.PublicKey), nil
+	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("public key is not ECDSA")
+	}
+	return ecdsaPub, nil
 }
 
 func verifyDeviceData(deviceID uint, fallbackPublicKey *string, payload []byte) (*db.MQTTPayload, error) {

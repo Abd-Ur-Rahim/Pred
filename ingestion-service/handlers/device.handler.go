@@ -121,7 +121,7 @@ func UpdateDeviceActiveStatusHandler(gdb *gorm.DB) gin.HandlerFunc {
 		}
 
 		var req struct {
-			IsActive bool `json:"is_active" binding:"required"`
+			IsActive bool `json:"is_active"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
@@ -132,11 +132,6 @@ func UpdateDeviceActiveStatusHandler(gdb *gorm.DB) gin.HandlerFunc {
 			log.Printf("failed to update device status: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update device status"})
 			return
-		}
-		if redisCache != nil {
-			if err := redisCache.UpdateDeviceActiveStatus(context.Background(), uint(deviceID64), req.IsActive); err != nil {
-				log.Printf("failed to update device state cache: device_id=%d err=%v", deviceID64, err)
-			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "updated"})
@@ -153,10 +148,24 @@ func DeleteDeviceHandler(gdb *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		if err := db.DeleteDeviceByID(uint(deviceID64)); err != nil {
+		deviceID := uint(deviceID64)
+		if err := db.DeleteDeviceByID(deviceID); err != nil {
 			log.Printf("failed to delete device: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete device"})
 			return
+		}
+
+		if redisCache != nil {
+			if err := redisCache.CacheDeviceState(context.Background(), deviceID, false, ""); err != nil {
+				log.Printf("failed to update cached device state for deleted device_id=%d: %v", deviceID, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete device"})
+				return
+			}
+			if err := redisCache.CacheDevicePublicKey(context.Background(), deviceID, ""); err != nil {
+				log.Printf("failed to clear cached public key for deleted device_id=%d: %v", deviceID, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete device"})
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "deleted"})

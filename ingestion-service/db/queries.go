@@ -79,11 +79,23 @@ func UpdateDevicePublicKey(deviceID uint, publicKey string) error {
 // UpdateDeviceActiveStatus updates the is_active flag for a device.
 func UpdateDeviceActiveStatus(deviceID uint, isActive bool) error {
 	result := ORM.Model(&Device{}).Where("device_id = ?", deviceID).Update("is_active", isActive)
-	return result.Error
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // DeleteDeviceByID deletes a device by its device ID.
 func DeleteDeviceByID(deviceID uint) error {
 	result := ORM.Delete(&Device{}, "device_id = ?", deviceID)
-	return result.Error
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

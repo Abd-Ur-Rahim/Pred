@@ -50,7 +50,7 @@ test_result "Extract public key" $?
 
 echo ""
 echo "Step 4: Create device via HTTP..."
-DEVICE_ID=4
+DEVICE_ID=$(($(date +%s) + RANDOM))
 TENANT_ID=1
 DEVICE_RESPONSE=$(curl -s -X POST http://localhost:2500/devices/register \
   -H 'Content-Type: application/json' \
@@ -61,11 +61,7 @@ test_result "Create device (HTTP POST)" $?
 
 echo ""
 echo "Step 5: Register device public key via MQTT..."
-PUBLIC_KEY=$(cat /tmp/test-device-public.pem)
-REGISTRATION_JSON=$(cat << EOF
-{"public_key": "$(echo "$PUBLIC_KEY" | jq -Rs .)"}
-EOF
-)
+REGISTRATION_JSON=$(jq -Rs '{public_key: .}' /tmp/test-device-public.pem)
 
 docker compose exec mosquitto mosquitto_pub \
   -h localhost -p 8883 \
