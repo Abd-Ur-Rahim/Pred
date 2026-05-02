@@ -41,6 +41,64 @@ cp .env.example .env
 go run .
 ```
 
+## MQTT Device Data Payload Format
+
+Devices send signed telemetry via MQTT to `devices/{deviceID}/data`. The payload envelope must contain:
+
+```json
+{
+	"timestamp": 1704067200,
+	"nonce": "n-1",
+	"data": {
+		"mode": "normal",
+		"v_rms": 1.23,
+		"temp_c": 72.4,
+		"peak_hz_1": 50,
+		"peak_hz_2": 100,
+		"peak_hz_3": 150,
+		"status": "ok"
+	},
+	"signature": "BASE64_ENCODED_ECDSA_SIGNATURE"
+}
+```
+
+**Important: JSON Field Order**
+
+The signature is computed over the exact **byte sequence** of the `data` object, **not** a re-marshaled version. This means:
+
+1. **Device** signs the byte representation of its `data` object using ECDSA + SHA256.
+2. **Server** receives the envelope, extracts `data` as raw bytes, and verifies the signature against those exact bytes.
+3. If field order differs between device and server JSON marshaling, verification **will fail**.
+
+**Best Practice**: Use canonical JSON (alphabetically sorted keys) or document a fixed field order, so both sides match:
+
+**Canonical order** for `data`:
+```
+mode, peak_hz_1, peak_hz_2, peak_hz_3, status, temp_c, v_rms
+```
+
+Example device pseudo-code:
+```python
+data = {
+	"mode": "normal",
+	"peak_hz_1": 50,
+	"peak_hz_2": 100,
+	"peak_hz_3": 150,
+	"status": "ok",
+	"temp_c": 72.4,
+	"v_rms": 1.23
+}
+data_bytes = json.dumps(data, separators=(',', ':')).encode('utf-8')  # no spaces
+signature = sign(sha256(data_bytes), private_key)
+envelope = {
+	"timestamp": int(time.time()),
+	"nonce": "unique-id-per-message",
+	"data": data,
+	"signature": base64.encode(signature)
+}
+mqtt.publish(f"devices/{device_id}/data", json.dumps(envelope))
+```
+
 ## Tests
 
 Integration tests need their own Postgres (separate from the dev one) and skip when `TEST_DATABASE_URL` is unset. Use the Makefile targets — they bring up `../docker-compose.test.yml` at the repo root and inject the env var:

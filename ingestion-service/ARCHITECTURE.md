@@ -22,22 +22,54 @@ This document describes the architecture of the `ingestion-service` (device-faci
 4. Producer publishes canonical event to Kafka (`events` topic) with key set to `tenant_id` or `device_id` (partitioning strategy).
 5. Service returns success ack to device/gateway (HTTP 200 / MQTT PUBACK).
 
-## Message contract (output to Kafka)
-Canonical event published by `ingestion-service` (always include `tenant_id`):
+## MQTT Device Data Payload (device → ingestion)
+
+Devices publish signed telemetry to `devices/{deviceID}/data`. The payload envelope must contain an ECDSA signature over the exact bytes of the `data` object.
 
 ```json
 {
-  "message_id": "uuid-...",
-  "tenant_id": "tenant-123",
-  "device_id": "device-001",
-  "received_at": "2026-05-02T15:04:05Z",
-  "timestamp": "2026-05-02T15:04:00Z",
-  "metrics": {"temperature_c": 72.5},
-  "meta": {"firmware_version":"1.2.3","source":"mqtt"}
+  "timestamp": 1704067200,
+  "nonce": "unique-nonce-per-message",
+  "data": {
+    "mode": "normal",
+    "peak_hz_1": 50,
+    "peak_hz_2": 100,
+    "peak_hz_3": 150,
+    "status": "ok",
+    "temp_c": 72.4,
+    "v_rms": 1.23
+  },
+  "signature": "BASE64_ENCODED_ECDSA_SHA256_SIGNATURE"
 }
 ```
 
-Notes:
+**Signature Verification Logic:**
+1. Extract `data` as raw bytes from the JSON payload (not re-marshaled).
+2. Compute SHA256 hash of those bytes.
+3. Verify ECDSA signature against the hash using the device's registered public key.
+4. Check `nonce` for replay attacks (Redis-backed list of used nonces per device).
+5. If all checks pass, unmarshal `data` and forward to Kafka.
+
+**Important**: JSON field order in `data` must be deterministic (canonically ordered). If device and server marshal JSON differently, signature verification will fail.
+
+## Kafka Output Payload (ingestion → Kafka)
+
+The ingestion service publishes the sensor data to Kafka with device metadata:
+
+```json
+{
+  "device_id": 1,
+  "timestamp": 1704067200,
+  "mode": "normal",
+  "v_rms": 1.23,
+  "temp_c": 72.4,
+  "peak_hz_1": 50,
+  "peak_hz_2": 100,
+  "peak_hz_3": 150,
+  "status": "ok"
+}
+```
+
 - `message_id` should be a stable id for idempotency/deduplication downstream.
 - `timestamp` is device-supplied event time; `received_at` is ingestion time.
 
