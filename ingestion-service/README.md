@@ -41,6 +41,24 @@ cp .env.example .env
 go run .
 ```
 
+## HTTP API: Device registration
+
+Register a device (creates DB entry). Endpoint:
+
+- `POST /devices/register` — body: `{ "device_id": <uint>, "tenant_id": <uint> }`
+
+Example:
+
+```sh
+curl -s -X POST http://localhost:8080/devices/register \
+	-H 'Content-Type: application/json' \
+	-d '{"device_id":1,"tenant_id":1}' | jq .
+```
+
+On success you will receive `{"registration_status":"ok"}` (HTTP 201).
+
+If you see `{"error":"failed to register device"}` the service logged the underlying DB error — check the service logs for details (timestamp mismatch or schema issues are common when models change).
+
 ## MQTT Device Data Payload Format
 
 Devices send signed telemetry via MQTT to `devices/{deviceID}/data`. The payload envelope must contain:
