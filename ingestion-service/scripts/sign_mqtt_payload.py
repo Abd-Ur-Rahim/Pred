@@ -13,7 +13,7 @@ import hashlib
 import base64
 import time
 import sys
-from ecdsa import SigningKey, NIST256p
+from ecdsa import SigningKey, NIST256p, util
 
 def sign_payload(private_key_path, mode, v_rms, temp_c, peak_hz1, peak_hz2, peak_hz3, status):
     """Generate a signed MQTT payload for device telemetry."""
@@ -39,7 +39,7 @@ def sign_payload(private_key_path, mode, v_rms, temp_c, peak_hz1, peak_hz2, peak
     
     # Sign: SHA256(data_bytes) with ECDSA
     data_hash = hashlib.sha256(data_bytes).digest()
-    signature_bytes = sk.sign_digest_deterministic(data_hash, hashfunc=hashlib.sha256)
+    signature_bytes = sk.sign_digest_deterministic(data_hash, hashfunc=hashlib.sha256, sigencode=util.sigencode_der)
     
     # Build envelope with timestamp and nonce
     nonce = f"n-{int(time.time() * 1000)}"
