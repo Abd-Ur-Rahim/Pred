@@ -3,6 +3,5 @@
 pattern write devices/%c/data
 
 user pred-ingestion
-topic deny devices/+/data
 topic read devices/+/data
 topic read $SYS/broker/version
