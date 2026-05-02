@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"ingestion-service/db"
 	"log"
 	"strconv"
 	"strings"
@@ -58,67 +59,54 @@ func ParsePublicKey(pemStr string) (*ecdsa.PublicKey, error) {
 	return pub.(*ecdsa.PublicKey), nil
 }
 
-func verifyDeviceData(deviceID uint, fallbackPublicKey *string, payload []byte) error {
-	var message struct {
-		Nonce     string          `json:"nonce"`
-		Payload   json.RawMessage `json:"payload"`
-		Signature string          `json:"signature"`
-	}
-
-	if err := json.Unmarshal(payload, &message); err != nil {
-		return fmt.Errorf("invalid signed payload: %w", err)
-	}
-	if message.Nonce == "" {
-		return fmt.Errorf("nonce is required")
-	}
-	if len(message.Payload) == 0 {
-		return fmt.Errorf("payload field is required")
-	}
-	if message.Signature == "" {
-		return fmt.Errorf("signature is required")
+func verifyDeviceData(deviceID uint, fallbackPublicKey *string, payload []byte) (*db.MQTTPayload, error) {
+	message, err := verifyRawDataStructure(payload)
+	if err != nil {
+		return nil, err
 	}
 
 	publicKeyPEM, err := resolveDevicePublicKey(deviceID, fallbackPublicKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	publicKey, err := ParsePublicKey(publicKeyPEM)
 	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
 	}
 
 	if redisCache != nil {
 		exists, err := redisCache.NonceExists(context.Background(), deviceID, message.Nonce)
 		if err != nil {
-			return fmt.Errorf("nonce check failed: %w", err)
+			return nil, fmt.Errorf("nonce check failed: %w", err)
 		}
 		if exists {
-			return fmt.Errorf("replayed nonce")
+			return nil, fmt.Errorf("replayed nonce")
 		}
 	}
 
 	signatureBytes, err := base64.StdEncoding.DecodeString(message.Signature)
 	if err != nil {
-		return fmt.Errorf("invalid signature encoding: %w", err)
+		return nil, fmt.Errorf("invalid signature encoding: %w", err)
 	}
 
-	if !verifySignature(publicKey, message.Payload, signatureBytes) {
-		return fmt.Errorf("signature verification failed")
+	// Signature is computed over the exact bytes of the 'data' field
+	if !verifySignature(publicKey, message.Data, signatureBytes) {
+		return nil, fmt.Errorf("signature verification failed")
 	}
 
 	if redisCache != nil {
 		marked, err := redisCache.MarkNonceUsed(context.Background(), deviceID, message.Nonce)
 		if err != nil {
-			return fmt.Errorf("failed to mark nonce used: %w", err)
+			return nil, fmt.Errorf("failed to mark nonce used: %w", err)
 		}
 		if !marked {
-			return fmt.Errorf("replayed nonce")
+			return nil, fmt.Errorf("replayed nonce")
 		}
 	}
 
-	log.Printf("verified signed payload for device_id=%d payload_bytes=%d", deviceID, len(message.Payload))
-	return nil
+	log.Printf("verified signed payload for device_id=%d payload_bytes=%d", deviceID, len(message.Data))
+	return message, nil
 }
 
 func resolveDevicePublicKey(deviceID uint, fallbackPublicKey *string) (string, error) {
@@ -141,4 +129,40 @@ func resolveDevicePublicKey(deviceID uint, fallbackPublicKey *string) (string, e
 	}
 
 	return key, nil
+}
+
+func prepareKafkaPayload(deviceID uint, timestamp int64, data db.SensorDeviceData) *db.KafkaPayload {
+	return &db.KafkaPayload{
+		DeviceID:  deviceID,
+		Timestamp: timestamp,
+		Mode:      data.Mode,
+		VRMS:      data.VRMS,
+		TempC:     data.TempC,
+		PeakHz1:   data.PeakHz1,
+		PeakHz2:   data.PeakHz2,
+		PeakHz3:   data.PeakHz3,
+		Status:    data.Status,
+	}
+}
+
+func verifyRawDataStructure(payload []byte) (*db.MQTTPayload, error) {
+	var message db.MQTTPayload
+
+	if err := json.Unmarshal(payload, &message); err != nil {
+		return nil, fmt.Errorf("invalid signed payload: %w", err)
+	}
+	if len(message.Data) == 0 {
+		return nil, fmt.Errorf("data field is required")
+	}
+	if message.Nonce == "" {
+		return nil, fmt.Errorf("nonce is required")
+	}
+	if message.Signature == "" {
+		return nil, fmt.Errorf("signature is required")
+	}
+	if message.Timestamp == 0 {
+		return nil, fmt.Errorf("timestamp is required")
+	}
+
+	return &message, nil
 }

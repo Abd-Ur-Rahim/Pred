@@ -120,8 +120,9 @@ func TestVerifyDeviceData_Succeeds(t *testing.T) {
 
 	outer := map[string]interface{}{
 		"nonce":     "n-1",
-		"payload":   json.RawMessage(innerBytes),
+		"data":      json.RawMessage(innerBytes),
 		"signature": base64.StdEncoding.EncodeToString(sig),
+		"timestamp": int64(1000),
 	}
 	outerBytes, err := json.Marshal(outer)
 	if err != nil {
@@ -129,7 +130,11 @@ func TestVerifyDeviceData_Succeeds(t *testing.T) {
 	}
 
 	// call verifyDeviceData using fallback public key
-	if err := verifyDeviceData(1, &pemStr, outerBytes); err != nil {
+	message, err := verifyDeviceData(1, &pemStr, outerBytes)
+	if err != nil {
 		t.Fatalf("verifyDeviceData failed: %v", err)
+	}
+	if message == nil {
+		t.Fatalf("verifyDeviceData returned nil message")
 	}
 }

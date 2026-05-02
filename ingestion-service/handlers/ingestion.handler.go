@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"strconv"
 
@@ -49,7 +50,7 @@ func handleMQTTDataMessage(deviceID uint, msg mqtt.Message) {
 		return
 	}
 
-	err := verifyDeviceData(deviceID, fallbackPublicKey, msg.Payload())
+	message, err := verifyDeviceData(deviceID, fallbackPublicKey, msg.Payload())
 	if err != nil {
 		log.Printf("failed to verify/process device data: device_id=%d err=%v", deviceID, err)
 		return
@@ -61,8 +62,21 @@ func handleMQTTDataMessage(deviceID uint, msg mqtt.Message) {
 		return
 	}
 
+	var sensorData db.SensorDeviceData
+	if err := json.Unmarshal(message.Data, &sensorData); err != nil {
+		log.Printf("failed to unmarshal sensor data: device_id=%d err=%v", deviceID, err)
+		return
+	}
+
+
 	deviceKey := strconv.FormatUint(uint64(deviceID), 10)
-	if err := kafkaProducer.Publish(context.Background(), deviceKey, msg.Payload()); err != nil {
+	kafkaPayload := prepareKafkaPayload(deviceID, message.Timestamp, sensorData)
+	kafkaJSON, err := json.Marshal(kafkaPayload)
+	if err != nil {
+		log.Printf("failed to marshal kafka message: %v", err)
+		return
+	}
+	if err := kafkaProducer.Publish(context.Background(), deviceKey, kafkaJSON); err != nil {
 		log.Printf("failed to publish message to kafka: %v", err)
 		return
 	}
