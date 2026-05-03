@@ -137,9 +137,10 @@ You should see `Access-Control-Allow-Origin: http://localhost:3000` and `Access-
    curl http://localhost:8002/plugins | jq '.data[] | select(.name == "jwt") | {name, route}'
    ```
    Should show 3 entries (one per route)
-2. If missing, restart Kong to reload `kong.yml`:
+2. If missing, check the sidecar logs and force a re-push by restarting it:
    ```bash
-   docker-compose rm -f -s kong && docker-compose up -d kong
+   docker-compose logs kong-jwks-sync
+   docker-compose restart kong-jwks-sync
    ```
 
 ### "failure to get a peer from the ring-balancer"
@@ -172,22 +173,34 @@ Check logs with `docker-compose logs kong`. Common issues:
    curl http://localhost:8002/plugins | jq '.data[] | select(.name == "cors") | .config'
    ```
 2. Verify your frontend origin is in the `origins` list (default: `localhost:3000`, `localhost:8000`)
-3. If using a different origin, update `kong.yml` and restart Kong
+3. If using a different origin, update `kong.yml` and restart the sidecar (`docker-compose restart kong-jwks-sync`) to push the new config to Kong
 
 ## Setup & Configuration
 
-### Automatic JWT Key Injection (setup-kong.sh)
+### JWKS sidecar (`kong-jwks-sync`)
 
-The `setup-kong.sh` script automatically fetches the Keycloak JWT public key and injects it into `kong.yml`. Run this after Keycloak is initialized:
+Kong's bundled `jwt` plugin only accepts a static `rsa_public_key`, so a small
+sidecar container keeps that key in sync with Keycloak's JWKS endpoint at
+runtime. Source: `kong/jwks-sync/`.
 
-```bash
-./kong/setup-kong.sh
-```
+How it works:
 
-This script:
+1. Kong starts in DB-less mode with **no declarative config file** — its initial
+   runtime state is empty (Admin API up, no routes).
+2. The `kong-jwks-sync` sidecar polls Keycloak's JWKS endpoint
+   (`/realms/prod-maintenance/protocol/openid-connect/certs`) every
+   `POLL_INTERVAL` seconds (default 300s).
+3. It extracts the RS256 signing key, substitutes `__RSA_PUBLIC_KEY__` in
+   `kong/kong.yml` (which is mounted into the sidecar, **not** into Kong), and
+   POSTs the rendered config to Kong's Admin API at `/config`. Kong applies it
+   atomically without restarting.
+4. If Keycloak rotates its signing key, the next poll cycle picks it up and
+   pushes a new config — no manual intervention.
 
-1. Waits for Keycloak to be ready
-2. Fetches the JWKS (JSON Web Key Set) from Keycloak
-3. Extracts the RSA public key
-4. Updates `kong.yml` with the correct public key
-5. Restarts Kong to load the updated configuration
+On a fresh `docker-compose up`, there's a brief window (typically <10s) where
+Kong has no routes configured while the sidecar waits for Keycloak and pushes
+the first config. The sidecar retries every `RETRY_INTERVAL` seconds (default
+5s) until both Keycloak and Kong are reachable.
+
+`kong/kong.yml` is the **template** — it contains the placeholder
+`__RSA_PUBLIC_KEY__` rather than a real key, and is read only by the sidecar.

@@ -111,13 +111,8 @@ jwt_secrets:
   - consumer: keycloak-consumer
     key: "http://localhost:8080/realms/prod-maintenance"
     algorithm: RS256
+    # Placeholder — replaced at runtime by the kong-jwks-sync sidecar with the
+    # current Keycloak signing key, then POSTed to Kong's Admin API /config.
+    # This file is NOT loaded by Kong directly; the sidecar is the only reader.
     rsa_public_key: |
-      -----BEGIN PUBLIC KEY-----
-      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwzFr/h8TCFoA30M4MRxY
-      me3W4PjsSjqHjGVwK9SnZxufVaKhHdrXjmxfiiHjhL6Oqta4Qjix/ZnMSRk1VMcv
-      7sIuGVG/vlIYJWMVX//SZg/q+d8I+eRpPeCne6gp8FkvT52B+Ugmkpt9KNbJPriQ
-      8bTv1IMDrfQLRWSF/+cBWVMRgFCJE3zS2Aghdp5BFMK7Ngu/uzKF8QelYYhjLEZz
-      LQEcjx3Lhfzs6dDJVe5Bl8Vm8MWwHOtajZ0cLFEfB1eFLN2MPreIq3vp+2YMKiZ4
-      s6JSESepQkM3AgLdwhBlRQy17L9Eby9ADIMTOdy0SozVGPn/wZGZ7/rOKU9OsshT
-      2wIDAQAB
-      -----END PUBLIC KEY-----
+__RSA_PUBLIC_KEY__
