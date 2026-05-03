@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertsView } from "@/components/views/alerts";
+import { AlertsIncidentManagement } from "@/components/ui/alerts-incident-management";
 
 export default function AlertsPage() {
-  return <AlertsView />;
+  return <AlertsIncidentManagement />;
 }

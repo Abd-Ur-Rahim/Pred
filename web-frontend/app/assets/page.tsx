@@ -1,7 +1,7 @@
 "use client";
 
-import { AssetsView } from "@/components/views/assets";
+import { AssetManagement } from "@/components/ui/asset-management";
 
 export default function AssetsPage() {
-  return <AssetsView />;
+  return <AssetManagement />;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { PredictionsView } from "@/components/views/predictions";
+import { PredictionsDashboard } from "@/components/ui/predictions-dashboard";
 
 export default function PredictionsPage() {
-  return <PredictionsView />;
+  return <PredictionsDashboard />;
 }
