@@ -17,13 +17,26 @@ Kong uses `strip_path: true` to remove the prefix before forwarding to the upstr
 |-----------|-----------------|---------|
 | `/api/ingest/*` | `ingestion-service:8003` | `GET /api/ingest/devices` → `GET /devices` |
 | `/api/events/*` | `event-processing-service:8001` | `GET /api/events/health` → `GET /health` |
+| `/api/notifications/*` | `notifications-service:8002` | `POST /api/notifications/send` → `POST /send` |
 
 ### DB-less Mode
 Kong is configured in **DB-less mode**. Instead of relying on a Postgres database, its entire routing and plugin configuration is loaded directly into memory from the declarative `kong.yml` file. This makes the gateway lightweight and easy to version control.
 
+## Authentication Requirements
+
+**All API endpoints protected by Kong require JWT authentication.**
+
+- **Token Source**: Keycloak (`http://localhost:8080/realms/prod-maintenance`)
+- **Token Format**: `Authorization: Bearer <JWT_TOKEN>`
+- **Required Claims**: `exp` (expiration time)
+- **Algorithm**: RS256 (RSA Public Key from Keycloak)
+
+See the [Verification Guide](#verification-guide) section for instructions on obtaining a test JWT token.
+
 ### Plugins Enabled
-- **CORS**: Handles Cross-Origin Resource Sharing so the web frontend can safely communicate with the API Gateway.
-- **Rate Limiting**: Restricts API calls to 60 requests per minute per IP to prevent abuse and accidental spikes.
+- **JWT**: Enforces JSON Web Token (JWT) authentication on protected routes. All API endpoints require a valid JWT token from Keycloak (`Authorization: Bearer <token>`). Claims verified: `exp` (expiration).
+- **CORS**: Handles Cross-Origin Resource Sharing for safe frontend communication. Configured for `localhost:3000` and `localhost:8000` with credentials enabled.
+- **Rate Limiting**: Restricts API calls to 600 requests per minute per IP to prevent abuse and accidental spikes.
 - **Request Size Limiting**: Prevents payloads larger than 10MB to protect the ingestion service from DoS attacks.
 
 ## Verification Guide
@@ -34,41 +47,80 @@ curl http://localhost:8002/
 ```
 You should see a large JSON payload describing the Kong node configuration.
 
-### 2. Verify Routing
-Test the ingestion service through Kong:
-```bash
-curl -i http://localhost:8000/api/ingest/health
-```
-Expected: `200 OK` with `{"status":"ok"}`
+### 2. Verify Routing (JWT Required)
 
-Test the event-processing service through Kong:
+**Note**: All routes require a valid JWT token. Without authentication, you'll receive `401 Unauthorized`.
+
+Test without JWT (should fail):
 ```bash
 curl -i http://localhost:8000/api/events/health
 ```
-Expected: `200 OK` with `{"status":"ok"}`
+Expected: `401 Unauthorized` with `{"message":"Unauthorized"}`
 
-Test a business endpoint:
+To test with a valid JWT, obtain a token from Keycloak:
 ```bash
-curl -i http://localhost:8000/api/ingest/devices
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/prod-maintenance/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=web-frontend&client_secret=dev-web-frontend-secret&grant_type=client_credentials" | jq -r '.access_token')
+
+# Test with JWT
+curl -i http://localhost:8000/api/events/health -H "Authorization: Bearer $TOKEN"
 ```
-Expected: `400 Bad Request` with `{"error":"tenant_id query param is required"}` (proves routing works end-to-end).
+
+Test the ingestion service through Kong:
+```bash
+curl -i http://localhost:8000/api/ingest/health -H "Authorization: Bearer $TOKEN"
+```
+Expected: `200 OK`
+
+Test the notifications service through Kong:
+```bash
+curl -i http://localhost:8000/api/notifications/health -H "Authorization: Bearer $TOKEN"
+```
+Expected: `200 OK`
 
 ### 3. Verify Rate Limiting
-Send 65 rapid requests to the gateway:
+Send 610 rapid requests to the gateway:
 ```bash
-for i in {1..65}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/ingest/health; done
+for i in {1..610}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/events 2>&1; done
 ```
-You should see `200` responses initially, and eventually `429 Too Many Requests` once the 60-request quota is exceeded.
+You should see `401` responses initially (no JWT), and eventually `429 Too Many Requests` once the 600-request quota is exceeded.
 
 ### 4. Verify CORS Headers
 ```bash
-curl -i -X OPTIONS http://localhost:8000/api/ingest/health \
+curl -i -X OPTIONS http://localhost:8000/api/ingest \
   -H "Origin: http://localhost:3000" \
   -H "Access-Control-Request-Method: GET"
 ```
-You should see `Access-Control-Allow-Origin: *` in the response headers.
+You should see `Access-Control-Allow-Origin: http://localhost:3000` and `Access-Control-Allow-Credentials: true` in the response headers.
 
 ## Troubleshooting
+
+### "Unauthorized" (401) responses on all requests
+**Cause**: Missing or invalid JWT token in the `Authorization` header.
+
+**Solution**: 
+1. Verify you're including the `Authorization: Bearer <TOKEN>` header
+2. Check that the token is not expired (`exp` claim)
+3. Verify the token was issued by the correct Keycloak realm (`prod-maintenance`)
+4. Check Kong admin API to verify JWT plugin is attached to routes:
+   ```bash
+   curl http://localhost:8002/plugins | jq '.data[] | select(.name == "jwt")'
+   ```
+
+### JWT Plugin Not Enforcing Authentication
+**Cause**: JWT plugin may not be properly attached to routes.
+
+**Solution**:
+1. Verify JWT is attached to all routes:
+   ```bash
+   curl http://localhost:8002/plugins | jq '.data[] | select(.name == "jwt") | {name, route}'
+   ```
+   Should show 3 entries (one per route)
+2. If missing, restart Kong to reload `kong.yml`:
+   ```bash
+   docker-compose rm -f -s kong && docker-compose up -d kong
+   ```
 
 ### "failure to get a peer from the ring-balancer"
 This means Kong's active health checks have marked the upstream targets as unhealthy. Common causes:
@@ -81,5 +133,33 @@ This means Kong's active health checks have marked the upstream targets as unhea
 
 ### Kong won't start
 Check logs with `docker-compose logs kong`. Common issues:
-- Invalid `kong.yml` syntax
-- Custom plugin not installed (stick with bundled plugins)
+- Invalid `kong.yml` syntax (run `docker-compose logs kong` to see error details)
+- Custom plugin not installed (stick with bundled plugins: cors, rate-limiting, jwt, request-size-limiting)
+- Invalid upstream target format (must be `hostname:port` without protocol prefix)
+
+### CORS Errors (browser blocks requests)
+**Cause**: Frontend origin not in CORS allowlist.
+
+**Solution**:
+1. Check current CORS configuration:
+   ```bash
+   curl http://localhost:8002/plugins | jq '.data[] | select(.name == "cors") | .config'
+   ```
+2. Verify your frontend origin is in the `origins` list (default: `localhost:3000`, `localhost:8000`)
+3. If using a different origin, update `kong.yml` and restart Kong
+
+## Setup & Configuration
+
+### Automatic JWT Key Injection (setup-kong.sh)
+The `setup-kong.sh` script automatically fetches the Keycloak JWT public key and injects it into `kong.yml`. Run this after Keycloak is initialized:
+
+```bash
+./kong/setup-kong.sh
+```
+
+This script:
+1. Waits for Keycloak to be ready
+2. Fetches the JWKS (JSON Web Key Set) from Keycloak
+3. Extracts the RSA public key
+4. Updates `kong.yml` with the correct public key
+5. Restarts Kong to load the updated configuration

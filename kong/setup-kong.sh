@@ -50,7 +50,7 @@ upstreams:
       active:
         type: http
         http_path: /health
-        timeout: 1
+        timeout: 3
         concurrency: 10
         healthy:
           interval: 5
@@ -69,7 +69,7 @@ upstreams:
       active:
         type: http
         http_path: /health
-        timeout: 1
+        timeout: 3
         concurrency: 10
         healthy:
           interval: 5
@@ -83,27 +83,40 @@ upstreams:
 services:
   - name: event-processing
     host: event-processing-upstream
-    path: /
+    path: /tenants/default/events
     routes:
       - name: events-route
         paths:
           - /api/events
         strip_path: true
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
 
   - name: ingestion
     host: ingestion-upstream
-    path: /
+    path: /devices
     routes:
       - name: ingestion-route
         paths:
           - /api/ingest
         strip_path: true
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
 
 plugins:
   - name: cors
     config:
       origins:
-        - "*"
+        - "http://localhost:3000"
+        - "http://localhost:8000"
       methods:
         - GET
         - POST
@@ -125,17 +138,12 @@ plugins:
 
   - name: rate-limiting
     config:
-      minute: 60
+      minute: 600
       policy: local
 
   - name: request-size-limiting
     config:
       allowed_payload_size: 10
-
-  - name: jwt
-    config:
-      claims_to_verify:
-        - exp
 
 consumers:
   - username: keycloak-consumer

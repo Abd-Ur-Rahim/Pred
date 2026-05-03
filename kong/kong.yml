@@ -9,7 +9,7 @@ upstreams:
       active:
         type: http
         http_path: /health
-        timeout: 1
+        timeout: 3
         concurrency: 10
         healthy:
           interval: 5
@@ -28,7 +28,7 @@ upstreams:
       active:
         type: http
         http_path: /health
-        timeout: 1
+        timeout: 3
         concurrency: 10
         healthy:
           interval: 5
@@ -42,27 +42,40 @@ upstreams:
 services:
   - name: event-processing
     host: event-processing-upstream
-    path: /
+    path: /tenants/default/events
     routes:
       - name: events-route
         paths:
           - /api/events
         strip_path: true
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
 
   - name: ingestion
     host: ingestion-upstream
-    path: /
+    path: /devices
     routes:
       - name: ingestion-route
         paths:
           - /api/ingest
         strip_path: true
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
 
 plugins:
   - name: cors
     config:
       origins:
-        - "*"
+        - "http://localhost:3000"
+        - "http://localhost:8000"
       methods:
         - GET
         - POST
@@ -84,17 +97,12 @@ plugins:
 
   - name: rate-limiting
     config:
-      minute: 60
+      minute: 600
       policy: local
 
   - name: request-size-limiting
     config:
       allowed_payload_size: 10
-
-  - name: jwt
-    config:
-      claims_to_verify:
-        - exp
 
 consumers:
   - username: keycloak-consumer
@@ -105,11 +113,11 @@ jwt_secrets:
     algorithm: RS256
     rsa_public_key: |
       -----BEGIN PUBLIC KEY-----
-      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsSI7Mvr09mLz15e1u2gu
-      0g0qobGkyz3cFjCLfXlCHk+62gdyP9zLwLAwlPaUIZ6ZGtqknmO8XVt0ARAT6An2
-      UUr5rFDNUwc3nhhEg84xvOKEJ1Gzl0iVE2mHySd+ZZr/VpOT0HbuDfsBl5MqueoZ
-      qJ68wLKHfw3SXtMe+CSbfTjJu5MQYiA/pophjsAON/4PGjdTxTGXtpbMo/UJrlOX
-      /062CsTgK7aOg6uM1Bi8B/MQU6KQB2PhiINPwN9jBYCOYnnHTaW51iroGj4JTndu
-      OGelQmkSOMct8grjVEqhT/M8NhVS82ctm1Wk7L9S+f9JNDPhs0HaIIcD4KCO9jRa
-      fwIDAQAB
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwzFr/h8TCFoA30M4MRxY
+      me3W4PjsSjqHjGVwK9SnZxufVaKhHdrXjmxfiiHjhL6Oqta4Qjix/ZnMSRk1VMcv
+      7sIuGVG/vlIYJWMVX//SZg/q+d8I+eRpPeCne6gp8FkvT52B+Ugmkpt9KNbJPriQ
+      8bTv1IMDrfQLRWSF/+cBWVMRgFCJE3zS2Aghdp5BFMK7Ngu/uzKF8QelYYhjLEZz
+      LQEcjx3Lhfzs6dDJVe5Bl8Vm8MWwHOtajZ0cLFEfB1eFLN2MPreIq3vp+2YMKiZ4
+      s6JSESepQkM3AgLdwhBlRQy17L9Eby9ADIMTOdy0SozVGPn/wZGZ7/rOKU9OsshT
+      2wIDAQAB
       -----END PUBLIC KEY-----

@@ -96,8 +96,6 @@ services:
       - MQTT_USERNAME=${MQTT_INGESTION_USERNAME:-pred-ingestion}
       - MQTT_PASSWORD=${MQTT_INGESTION_PASSWORD:-dev-ingestion-password}
       - MQTT_TOPIC=sensors/data
-    ports:
-      - "8003:8003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,8 +109,6 @@ services:
       - HTTP_PORT=8001
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/events
       - KAFKA_BROKERS=kafka:29092
-    ports:
-      - "8001:8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,7 +128,7 @@ services:
         condition: service_started
 
   kong:
-    image: kong:3
+    image: kong:3.4.1
     environment:
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/etc/kong/kong.yml
