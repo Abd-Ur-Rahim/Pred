@@ -12,10 +12,15 @@ import (
 	"ingestion-service/services"
 )
 
-var kafkaProducer *services.KafkaProducer
 var redisCache *services.RedisCache
 
-func SetKafkaProducer(producer *services.KafkaProducer) {
+type KafkaPublisher interface {
+	Publish(ctx context.Context, key string, payload []byte) error
+}
+
+var kafkaProducer KafkaPublisher
+
+func SetKafkaProducer(producer KafkaPublisher) {
 	kafkaProducer = producer
 }
 
