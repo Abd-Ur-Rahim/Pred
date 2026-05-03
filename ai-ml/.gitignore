@@ -23,4 +23,5 @@ build/
 .DS_Store
 /dataset
 /results/processed
-.venv__pycache__/
+__pycache__/
+.venv/
