@@ -44,9 +44,11 @@ func RegisterDeviceHTTP(gdb *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		if redisCache != nil {
-			if err := redisCache.CacheDeviceState(context.Background(), req.DeviceID, false, ""); err != nil {
-				log.Printf("failed to cache initial device state: device_id=%d err=%v", req.DeviceID, err)
-			}
+			go func(deviceID uint) {
+				if err := redisCache.CacheDeviceState(context.Background(), deviceID, false, ""); err != nil {
+					log.Printf("failed to cache initial device state: device_id=%d err=%v", deviceID, err)
+				}
+			}(req.DeviceID)
 		}
 		log.Printf("device registered: device_id=%d tenant_id=%d", device.DeviceID, device.TenantID)
 		c.JSON(http.StatusCreated, db.DeviceRegistrationResponse{RegistrationStatus: "ok"})
@@ -156,16 +158,14 @@ func DeleteDeviceHandler(gdb *gorm.DB) gin.HandlerFunc {
 		}
 
 		if redisCache != nil {
-			if err := redisCache.CacheDeviceState(context.Background(), deviceID, false, ""); err != nil {
-				log.Printf("failed to update cached device state for deleted device_id=%d: %v", deviceID, err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete device"})
-				return
-			}
-			if err := redisCache.CacheDevicePublicKey(context.Background(), deviceID, ""); err != nil {
-				log.Printf("failed to clear cached public key for deleted device_id=%d: %v", deviceID, err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete device"})
-				return
-			}
+			go func(did uint) {
+				if err := redisCache.CacheDeviceState(context.Background(), did, false, ""); err != nil {
+					log.Printf("failed to update cached device state for deleted device_id=%d: %v", did, err)
+				}
+				if err := redisCache.CacheDevicePublicKey(context.Background(), did, ""); err != nil {
+					log.Printf("failed to clear cached public key for deleted device_id=%d: %v", did, err)
+				}
+			}(deviceID)
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
@@ -198,12 +198,14 @@ func HandleMQTTDeviceRegistrationWithTemplate(client mqtt.Client, msg mqtt.Messa
 		return
 	}
 	if redisCache != nil {
-		if err := redisCache.CacheDevicePublicKey(context.Background(), deviceID, req.PublicKey); err != nil {
-			log.Printf("failed to cache public key for device_id=%d: %v", deviceID, err)
-		}
-		if err := redisCache.CacheDeviceState(context.Background(), deviceID, true, req.PublicKey); err != nil {
-			log.Printf("failed to cache active device state for device_id=%d: %v", deviceID, err)
-		}
+		go func(did uint, pubKey string) {
+			if err := redisCache.CacheDevicePublicKey(context.Background(), did, pubKey); err != nil {
+				log.Printf("failed to cache public key for device_id=%d: %v", did, err)
+			}
+			if err := redisCache.CacheDeviceState(context.Background(), did, true, pubKey); err != nil {
+				log.Printf("failed to cache active device state for device_id=%d: %v", did, err)
+			}
+		}(deviceID, req.PublicKey)
 	}
 
 	responseTopic := buildRegistrationResponseTopic(msg.Topic(), responseTopicTemplate)

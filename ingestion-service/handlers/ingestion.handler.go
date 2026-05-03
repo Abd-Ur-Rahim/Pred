@@ -41,9 +41,9 @@ func HandleMQTTMessage(client mqtt.Client, msg mqtt.Message) {
 
 	switch topicKind {
 	case mqttTopicRegistration:
-		HandleMQTTDeviceRegistrationWithTemplate(client, msg, registrationResponseTopicTemplate)
+		go HandleMQTTDeviceRegistrationWithTemplate(client, msg, registrationResponseTopicTemplate)
 	case mqttTopicData:
-		handleMQTTDataMessage(deviceID, msg)
+		go handleMQTTDataMessage(deviceID, msg)
 	default:
 		log.Printf("unsupported mqtt topic kind: %s", topicKind)
 	}

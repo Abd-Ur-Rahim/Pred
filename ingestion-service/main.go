@@ -25,18 +25,22 @@ func main() {
 		log.Fatalf("configuration invalid: %v", err)
 	}
 
+	log.Printf("Connecting to database...")
 	gdb, err := db.Open(context.Background(), config.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
+	log.Printf("Database connected successfully")
 
 	// Migrate the schema
 	if err := gdb.AutoMigrate(&db.Device{}); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}
 
+	log.Printf("Initializing Kafka producer...")
 	kafkaProducer := services.NewKafkaProducer(config.KafkaBrokers, config.KafkaTopic)
 	handlers.SetKafkaProducer(kafkaProducer)
+	log.Printf("Kafka producer initialized")
 
 	pubKeyTTL, err := time.ParseDuration(config.RedisPubKeyTTL)
 	if err != nil {
@@ -47,6 +51,7 @@ func main() {
 		log.Fatalf("Invalid REDIS_NONCE_TTL: %v", err)
 	}
 
+	log.Printf("Initializing Redis cache...")
 	redisCache, err := services.NewRedisCache(
 		config.RedisAddr,
 		config.RedisPassword,
@@ -58,6 +63,7 @@ func main() {
 		log.Fatalf("Failed to initialize Redis cache: %v", err)
 	}
 	handlers.SetRedisCache(redisCache)
+	log.Printf("Redis cache initialized")
 
 	// Start HTTP server as early as possible so health checks can succeed even
 	// while MQTT initialization is still connecting or retrying.
@@ -74,6 +80,7 @@ func main() {
 		}
 	}()
 
+	log.Printf("Creating MQTT client...")
 	mqttClient, err := services.CreateMQTTClient(
 		config.MQTTBroker,
 		config.MQTTClientID,
@@ -84,10 +91,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create MQTT client: %v", err)
 	}
+	log.Printf("MQTT client created")
 
+	log.Printf("Connecting to MQTT broker...")
 	if err := services.ConnectMQTTClient(mqttClient); err != nil {
 		log.Fatalf("MQTT connection failed: %v", err)
 	}
+	log.Printf("MQTT connected successfully")
 
 	handlers.SetRegistrationResponseTopicTemplate(config.MQTTDeviceRegistrationResponseTopic)
 
