@@ -126,12 +126,14 @@ func handleMessage(ctx context.Context, gdb *gorm.DB, hub *Hub, msg kafka.Messag
 	}
 
 	// Broadcast new notification to WebSocket clients
-	wsMsg := WSMessage{
-		Type: "new_notification",
-		Data: event.Payload,
+	if hub != nil {
+		wsMsg := WSMessage{
+			Type: "new_notification",
+			Data: event.Payload,
+		}
+		msgBytes, _ := json.Marshal(wsMsg)
+		hub.Broadcast(event.TenantID, msgBytes)
 	}
-	msgBytes, _ := json.Marshal(wsMsg)
-	hub.Broadcast(event.TenantID, msgBytes)
 
 	switch event.Type {
 	case "push":
@@ -208,6 +210,11 @@ func sendPush(token, platform string, payload json.RawMessage) error {
 func sendEmail(email string, payload json.RawMessage) error {
 	from := getEnv("EMAIL_USER", "")
 	password := getEnv("EMAIL_PASS", "")
+
+	if from == "" || password == "" {
+		log.Printf("email -> %s (SMTP not configured, skipping)", email)
+		return nil
+	}
 
 	msg := "Subject: Machine Alert\n\n" + string(payload)
 

@@ -54,7 +54,7 @@ func TestHandleMessage_Email(t *testing.T) {
 		},
 	}
 
-	if err := handleMessage(ctx, gdb, makeMessage(t, event)); err != nil {
+	if err := handleMessage(ctx, gdb, nil, makeMessage(t, event)); err != nil {
 		t.Fatalf("handleMessage: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func TestHandleMessage_Push(t *testing.T) {
 		},
 	}
 
-	if err := handleMessage(ctx, gdb, makeMessage(t, event)); err != nil {
+	if err := handleMessage(ctx, gdb, nil, makeMessage(t, event)); err != nil {
 		t.Fatalf("handleMessage: %v", err)
 	}
 
@@ -140,7 +140,7 @@ func TestHandleMessage_UnknownType(t *testing.T) {
 		Recipients: []Recipient{{UserID: "u1"}},
 	}
 
-	err := handleMessage(ctx, gdb, makeMessage(t, event))
+	err := handleMessage(ctx, gdb, nil, makeMessage(t, event))
 	if err == nil {
 		t.Fatal("expected error for unknown notification type, got nil")
 	}
@@ -151,7 +151,7 @@ func TestHandleMessage_InvalidJSON(t *testing.T) {
 	ctx := context.Background()
 
 	msg := kafka.Message{Value: []byte(`not valid json`)}
-	err := handleMessage(ctx, gdb, msg)
+	err := handleMessage(ctx, gdb, nil, msg)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON, got nil")
 	}
