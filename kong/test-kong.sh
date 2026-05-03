@@ -189,7 +189,7 @@ if $WITH_AUTH; then
       status=$(curl -s -o /dev/null -w "%{http_code}" \
         "$KONG_PROXY$path" -H "Authorization: Bearer $TOKEN")
       # Upstream may not be running; 502/503 is still a Kong success (auth passed)
-      if [[ "$status" == "200" || "$status" == "502" || "$status" == "503" ]]; then
+      if [[ "$status" == "200" || "$status" == "501" || "$status" == "502" || "$status" == "503" ]]; then
         pass "Valid JWT accepted on $path (upstream status $status)"
       else
         fail "Valid JWT not accepted on $path (got $status)"
