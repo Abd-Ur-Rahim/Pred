@@ -185,7 +185,7 @@ if $WITH_AUTH; then
   else
     pass "Obtained JWT from Keycloak"
 
-    for path in /api/events /api/ingest; do
+    for path in /api/events /api/ingest/health; do
       status=$(curl -s -o /dev/null -w "%{http_code}" \
         "$KONG_PROXY$path" -H "Authorization: Bearer $TOKEN")
       # Upstream may not be running; 502/503 is still a Kong success (auth passed)
