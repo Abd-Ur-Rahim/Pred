@@ -92,6 +92,14 @@ The ingestion service publishes the sensor data to Kafka with device metadata:
 - For production: enable TLS on MQTT and HTTPS for HTTP endpoints; configure client certs or token-based auth.
 - Secure Kafka with TLS and SASL in production.
 
+**⚠️ IMPORTANT - MQTT TLS Configuration:**
+The current code uses `InsecureSkipVerify: true` in the TLS config to handle localhost development scenarios where the broker certificate may not match the connection IP. **This disables TLS certificate validation and is insecure for production.**
+
+Before deploying to production:
+1. Generate proper TLS certificates with SANs covering your broker's hostname(s)
+2. Remove or set `InsecureSkipVerify: false` in `services/MQTT.service.go`
+3. Configure all clients to verify the broker's certificate against a trusted CA
+
 ## Observability & health
 - Expose `/health` for liveness and readiness.
 - Expose `/metrics` for Prometheus scraping (request rate, success/failure counts, Kafka publish latency, etc.).

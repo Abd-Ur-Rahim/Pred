@@ -149,3 +149,13 @@ docker compose exec mosquitto mosquitto_pub \
 - [ ] Review ACLs before adding new MQTT topics
 - [ ] Install production broker TLS certificates under `mosquitto/certs`
 - [ ] Store production secrets in a secret manager, not committed files
+- [ ] **Disable `InsecureSkipVerify` in ingestion service** (set to `false` in `services/MQTT.service.go`)
+- [ ] Generate certificates with proper SANs covering all broker hostnames/IPs
+
+**⚠️ IMPORTANT - TLS Certificate Verification:**
+The current ingestion service configuration uses `InsecureSkipVerify: true` which disables TLS certificate validation. This is acceptable for local development but **must be disabled in production**.
+
+Before deploying to production:
+1. Generate proper TLS certificates with SANs covering your broker's hostname(s)
+2. Set `InsecureSkipVerify: false` in `ingestion-service/services/MQTT.service.go`
+3. Configure all clients to verify the broker's certificate against a trusted CA

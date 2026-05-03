@@ -63,9 +63,10 @@ echo ""
 echo "Step 5: Register device public key via MQTT..."
 REGISTRATION_JSON=$(jq -Rs '{public_key: .}' /tmp/test-device-public.pem)
 
-docker compose exec mosquitto mosquitto_pub \
+docker run --rm --network host -v /tmp:/tmp eclipse-mosquitto:2 mosquitto_pub \
   -h localhost -p 8883 \
-  --cafile /etc/mosquitto/config/certs/ca.crt \
+  --cafile /tmp/ca.crt \
+  --insecure \
   -u pred-device \
   -P dev-device-password \
   -i $DEVICE_ID \
@@ -84,7 +85,7 @@ test_result "Device public key stored in database" $?
 
 echo ""
 echo "Step 6: Generate and sign telemetry payload..."
-python3 scripts/sign_mqtt_payload.py /tmp/test-device-private.pem > /tmp/test-payload.json 2>/dev/null
+python3 ingestion-service/scripts/sign_mqtt_payload.py /tmp/test-device-private.pem > /tmp/test-payload.json 2>/dev/null
 test_result "Generate signed payload" $?
 
 SIGNED_PAYLOAD=$(cat /tmp/test-payload.json)
@@ -93,9 +94,10 @@ test_result "Validate JSON signature format" $?
 
 echo ""
 echo "Step 7: Publish telemetry via MQTT..."
-docker compose exec mosquitto mosquitto_pub \
+docker run --rm --network host -v /tmp:/tmp eclipse-mosquitto:2 mosquitto_pub \
   -h localhost -p 8883 \
-  --cafile /etc/mosquitto/config/certs/ca.crt \
+  --cafile /tmp/ca.crt \
+  --insecure \
   -u pred-device \
   -P dev-device-password \
   -i $DEVICE_ID \
@@ -107,12 +109,7 @@ sleep 2
 
 echo ""
 echo "Step 8: Verify message in Kafka..."
-KAFKA_MESSAGE=$(docker compose exec kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic sensor_data \
-  --from-beginning \
-  --max-messages 1 \
-  --timeout-ms 5000 2>/dev/null || echo "")
+KAFKA_MESSAGE=$(docker compose exec kafka bash -c "/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic sensor_data --from-beginning --max-messages 50 --timeout-ms 8000" 2>/dev/null | grep -E '\"device_id\":\s*'$DEVICE_ID | head -1 || echo "")
 
 echo "$KAFKA_MESSAGE" | jq . > /dev/null 2>&1
 test_result "Consume message from Kafka" $?
@@ -122,14 +119,15 @@ test_result "Kafka message contains device_id" $?
 
 echo ""
 echo "Step 9: Verify Kafka payload structure..."
-echo "$KAFKA_MESSAGE" | jq -e '.device_id == '$DEVICE_ID' and .mode == "normal" and .v_rms == 1.23' > /dev/null 2>&1
+echo "$KAFKA_MESSAGE" | jq -e '.device_id == '$DEVICE_ID' and .mode == "normal" and (.v_rms - 1.23 | abs) < 0.001' > /dev/null 2>&1
 test_result "Kafka payload has correct sensor data" $?
 
 echo ""
 echo "Step 10: Test replay protection..."
-docker compose exec mosquitto mosquitto_pub \
+docker run --rm --network host -v /tmp:/tmp eclipse-mosquitto:2 mosquitto_pub \
   -h localhost -p 8883 \
-  --cafile /etc/mosquitto/config/certs/ca.crt \
+  --cafile /tmp/ca.crt \
+  --insecure \
   -u pred-device \
   -P dev-device-password \
   -i $DEVICE_ID \

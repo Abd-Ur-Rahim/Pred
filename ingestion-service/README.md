@@ -119,6 +119,16 @@ envelope = {
 mqtt.publish(f"devices/{device_id}/data", json.dumps(envelope))
 ```
 
+## Security Notes
+
+**⚠️ IMPORTANT - MQTT TLS Configuration:**
+The current code uses `InsecureSkipVerify: true` in `services/MQTT.service.go` which disables TLS certificate validation. This is acceptable for local development but **must be disabled in production**.
+
+Before deploying to production:
+1. Generate proper TLS certificates with SANs covering your broker's hostname(s)
+2. Remove or set `InsecureSkipVerify: false` in `services/MQTT.service.go`
+3. Configure the CA certificate path via `MQTT_CA_CERT` environment variable
+
 ## Tests
 
 Integration tests need their own Postgres (separate from the dev one) and skip when `TEST_DATABASE_URL` is unset. Use the Makefile targets — they bring up `../docker-compose.test.yml` at the repo root and inject the env var:

@@ -636,3 +636,11 @@ The integration test validates:
 - Multi-tenant device separation
 - Error scenario handling (malformed JSON, wrong tenant_id, etc.)
 - Horizontal scaling (multiple ingestion service instances with Kafka consumer groups)
+
+**⚠️ Production Security Note:**
+Before deploying to production, ensure you:
+1. Set `InsecureSkipVerify: false` in `services/MQTT.service.go` to enable proper TLS certificate validation
+2. Generate proper TLS certificates with SANs covering your broker's hostname(s)
+3. Configure all MQTT clients to verify the broker's certificate against a trusted CA
+
+The current configuration uses `InsecureSkipVerify: true` which is acceptable for local development/testing but **insecure for production**.

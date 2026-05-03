@@ -120,6 +120,14 @@ docker compose exec kafka kafka-console-consumer \
 - For production, require TLS for MQTT and authenticate devices with client certificates
 - Secure Kafka with TLS and SASL; do not expose brokers directly to the public internet
 
+**⚠️ IMPORTANT - TLS Certificate Verification:**
+The current MQTT client configuration uses `InsecureSkipVerify: true` which disables TLS certificate validation. This is acceptable for local development but **must be disabled in production**.
+
+Before deploying to production:
+1. Generate proper TLS certificates with SANs covering your broker's hostname(s)
+2. Set `InsecureSkipVerify: false` in `services/MQTT.service.go`
+3. Configure the CA certificate path via `MQTT_CA_CERT` environment variable
+
 ## Troubleshooting
 - If messages are not appearing on `sensor_data`, check:
   - Device is registered and has a valid public key

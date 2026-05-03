@@ -50,8 +50,8 @@ def sign_payload(private_key_path, mode, v_rms, temp_c, peak_hz1, peak_hz2, peak
         "signature": base64.b64encode(signature_bytes).decode('utf-8')
     }
     
-    # Return as JSON string
-    return json.dumps(envelope), nonce
+    # Return as compact JSON string (must match data serialization)
+    return json.dumps(envelope, separators=(',', ':'), sort_keys=False), nonce
 
 if __name__ == '__main__':
     private_key = sys.argv[1] if len(sys.argv) > 1 else '/tmp/device-private.pem'
