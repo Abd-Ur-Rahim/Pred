@@ -1,6 +1,7 @@
 "use client";
 
 <<<<<<< HEAD
+
 import { AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function DashboardPage() {
