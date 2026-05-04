@@ -5,6 +5,7 @@ import "./globals.css";
 import { LayoutContent } from "@/components/layout/layout-content";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { AuthProvider } from "./providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -41,9 +42,11 @@ export default function RootLayout({
 			)}
 		>
 			<body className="min-h-full flex flex-col">
-				<TooltipProvider>
-					<LayoutContent>{children}</LayoutContent>
-				</TooltipProvider>
+				<AuthProvider>
+					<TooltipProvider>
+						<LayoutContent>{children}</LayoutContent>
+					</TooltipProvider>
+				</AuthProvider>
 			</body>
 		</html>
 	);
