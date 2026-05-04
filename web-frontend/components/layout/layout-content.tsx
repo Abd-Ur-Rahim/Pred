@@ -81,30 +81,9 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
 
 			<div className="flex-1 bg-slate-950 text-white min-h-screen">
 				{/* Header */}
-				<div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur">
-					<div className="px-6 py-4 flex justify-between items-center">
-						<div className="flex gap-6">
-							{navItems.map(({ path, label }) => (
-								<Link
-									key={path}
-									href={path}
-									className={`text-sm font-semibold cursor-pointer pb-1 transition-colors ${
-										isActive(path)
-											? "text-blue-400 border-b-2 border-blue-400"
-											: "text-slate-400 hover:text-white"
-									}`}
-								>
-									{label === "Motors"
-										? "MOTORS"
-										: label === "Alerts"
-											? "ALERTS & INCIDENTS"
-											: label === "Assets"
-												? "ASSET MANAGEMENT"
-												: label.toUpperCase()}
-								</Link>
-							))}
-						</div>
-						<div className="flex items-center gap-4">
+				<div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur flex">
+					<div className="px-6 py-4 items-center w-full">
+						<div className="flex ml-auto items-center gap-4 w-fit">
 							<div className="text-xs text-slate-400">
 								SYSTEM STATUS:{" "}
 								<span className="text-green-400 font-semibold">OPTIMAL</span>
