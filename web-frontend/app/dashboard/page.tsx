@@ -222,7 +222,13 @@ export default function DashboardPage() {
 						className="w-full h-full p-4"
 						viewBox="0 0 400 100"
 						preserveAspectRatio="none"
+						role="img"
+						aria-labelledby="system-telemetry-chart-title"
 					>
+						<title id="system-telemetry-chart-title">
+							System-wide telemetry chart showing load and vibration over 24
+							hours
+						</title>
 						<polyline
 							points="0,60 50,50 100,55 150,40 200,45 250,35 300,50 350,30 400,45"
 							fill="none"

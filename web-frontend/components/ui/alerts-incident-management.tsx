@@ -268,9 +268,9 @@ export function AlertsIncidentManagement() {
 				<div className="grid grid-cols-4 gap-4 items-center">
 					{/* Severity Filter */}
 					<div>
-						<label className="text-xs text-slate-400 font-semibold block mb-2">
+						<p className="text-xs text-slate-400 font-semibold block mb-2">
 							FILTER BY SEVERITY:
-						</label>
+						</p>
 						<div className="flex gap-2">
 							{[
 								{ label: "CRITICAL", value: "CRITICAL", count: criticalCount },
@@ -299,9 +299,9 @@ export function AlertsIncidentManagement() {
 
 					{/* Asset Group Filter */}
 					<div>
-						<label className="text-xs text-slate-400 font-semibold block mb-2">
+						<p className="text-xs text-slate-400 font-semibold block mb-2">
 							ASSET GROUP:
-						</label>
+						</p>
 						<select
 							value={assetGroupFilter}
 							onChange={(e) => setAssetGroupFilter(e.target.value)}
@@ -317,9 +317,9 @@ export function AlertsIncidentManagement() {
 
 					{/* Time Range Filter */}
 					<div>
-						<label className="text-xs text-slate-400 font-semibold block mb-2">
+						<p className="text-xs text-slate-400 font-semibold block mb-2">
 							TIME RANGE:
-						</label>
+						</p>
 						<select
 							value={timeRange}
 							onChange={(e) => setTimeRange(e.target.value)}
