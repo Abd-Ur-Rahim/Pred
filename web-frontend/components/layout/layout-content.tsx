@@ -1,5 +1,6 @@
 "use client";
 
+import { SessionProvider } from "next-auth/react";
 import {
 	AlertTriangle,
 	Bell,
@@ -116,7 +117,9 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
 				</div>
 
 				{/* Main Content */}
-				<div className="p-6">{children}</div>
+				<div className="p-6">
+					<SessionProvider>{children}</SessionProvider>
+				</div>
 			</div>
 		</SidebarProvider>
 	);
