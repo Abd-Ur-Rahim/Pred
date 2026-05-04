@@ -33,6 +33,19 @@ services:
     ports:
       - "9092:9092"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   mosquitto:
     image: eclipse-mosquitto:2
     user: root
@@ -161,3 +174,4 @@ volumes:
   postgres_data:
   mosquitto_data:
   mosquitto_log:
+  redis_data:
